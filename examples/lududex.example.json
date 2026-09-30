@@ -1,0 +1,9 @@
+{
+  "parsers": [
+    {
+      "name": "Nintendo DS",
+      "root": "~/Games/Nintendo DS",
+      "extensions": [".nds"]
+    }
+  ]
+}

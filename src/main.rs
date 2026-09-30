@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use iced::{Element, widget::text};
+use serde::Deserialize;
 
 #[derive(Parser)]
 #[command(
@@ -10,23 +11,64 @@ use iced::{Element, widget::text};
 )]
 
 struct Cli {
+    #[arg(long, global = true)]
+    config: Option<std::path::PathBuf>,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
 
 #[derive(Subcommand)]
 enum Command {
-    Greet {
-        /// The person to greet.
-        name: String,
+    Parse {
+        #[arg(required_unless_present = "all")]
+        name: Option<String>,
+
+        #[arg(long, conflicts_with = "name")]
+        all: bool,
     },
+}
+
+#[derive(Deserialize)]
+struct Config {
+    parsers: Vec<ParserConfig>,
+}
+
+#[derive(Deserialize)]
+struct ParserConfig {
+    name: String,
+    root: String,
+    extensions: Vec<String>,
 }
 
 fn main() -> iced::Result {
     let cli = Cli::parse();
+
+    let config_file =
+        std::fs::read_to_string("examples/lududex.example.json").unwrap_or_else(|error| {
+            eprintln!("{error}");
+            std::process::exit(1);
+        });
+
+    let config_json: Config = serde_json::from_str(&config_file).unwrap_or_else(|error| {
+        eprintln!("{error}");
+        std::process::exit(1);
+    });
+
+    for parser in &config_json.parsers {
+        println!("Name: {}", parser.name);
+        println!("Root: {}", parser.root);
+        println!("Extensions: {}", parser.extensions.join(", "));
+    }
+
     match cli.command {
-        Some(Command::Greet { name }) => {
-            println!("Hello: {name}");
+        Some(Command::Parse { name, all }) => {
+            if all {
+                println!("Parsing all");
+            } else if let Some(name) = name {
+                println!("Parsing: {name}");
+            }
+
             Ok(())
         }
         None => iced::run(update, view),
