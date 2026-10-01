@@ -47,12 +47,18 @@ fn main() -> iced::Result {
     // TODO: use .config here instead of lududex.json
     let config_path = cli.config.unwrap_or_else(|| "lududex.json".into());
     let config_file = std::fs::read_to_string(&config_path).unwrap_or_else(|error| {
-        eprintln!("{error}");
+        eprintln!(
+            "Could not read config file '{}': {error}\nCheck that the path exists and the file is readable.",
+            config_path.display()
+        );
         std::process::exit(1);
     });
 
     let config_json: Config = serde_json::from_str(&config_file).unwrap_or_else(|error| {
-        eprintln!("{error}");
+        eprintln!(
+            "Could not parse config file '{}': {error}",
+            config_path.display()
+        );
         std::process::exit(1);
     });
 
