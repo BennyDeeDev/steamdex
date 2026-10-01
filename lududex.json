@@ -1,9 +1,14 @@
 {
   "parsers": [
     {
-      "name": "Sample Library",
-      "root": "test-data/sample-library",
-      "extensions": [".rom"]
+      "name": "Sample ROM Library",
+      "directory": "test-data/sample-library-rom",
+      "extension": [".rom"]
+    },
+    {
+      "name": "Sample EXE Library",
+      "directory": "test-data/sample-library-exe",
+      "extension": [".exe"]
     }
   ]
 }
