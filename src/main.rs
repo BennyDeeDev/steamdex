@@ -44,11 +44,12 @@ struct ParserConfig {
 fn main() -> iced::Result {
     let cli = Cli::parse();
 
-    let config_file =
-        std::fs::read_to_string("examples/lududex.example.json").unwrap_or_else(|error| {
-            eprintln!("{error}");
-            std::process::exit(1);
-        });
+    // TODO: use .config here instead of lududex.json
+    let config_path = cli.config.unwrap_or_else(|| "lududex.json".into());
+    let config_file = std::fs::read_to_string(&config_path).unwrap_or_else(|error| {
+        eprintln!("{error}");
+        std::process::exit(1);
+    });
 
     let config_json: Config = serde_json::from_str(&config_file).unwrap_or_else(|error| {
         eprintln!("{error}");
