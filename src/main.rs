@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 #[derive(Parser)]
 #[command(
-    name = "lududex",
+    name = "steamdex",
     about = "A cross-platform steam library manager",
     long_about = "Discover games and ROMs with configurable parsers, then organize them in your Steam library.",
     version
@@ -48,8 +48,8 @@ struct ParserConfig {
 fn main() -> iced::Result {
     let cli = Cli::parse();
 
-    // TODO: use .config here instead of lududex.json
-    let config_path = cli.config.unwrap_or_else(|| "lududex.json".into());
+    // TODO: use .config here instead of steamdex.json
+    let config_path = cli.config.unwrap_or_else(|| "steamdex.json".into());
     let config_file = std::fs::read_to_string(&config_path).unwrap_or_else(|error| {
         eprintln!(
             "Could not read config file '{}': {error}\nCheck that the path exists and the file is readable.",

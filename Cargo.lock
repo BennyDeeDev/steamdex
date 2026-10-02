@@ -1653,16 +1653,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f66e8d5d03f609abc3a39e6f08e4164ebf1447a732906d39eb9b99b7919ef39"
 
 [[package]]
-name = "lududex"
-version = "0.1.0"
-dependencies = [
- "clap",
- "iced",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2839,6 +2829,16 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "steamdex"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "iced",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "strict-num"
