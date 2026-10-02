@@ -9,8 +9,3 @@ your Steam library as non-Steam shortcuts, complete with metadata and artwork.
 Rather than relying on GUI-defined parsing rules, Steamdex puts declarative
 configuration first, making game discovery and library management reproducible,
 portable, and easy to automate.
-
-## Why the name?
-
-**Steamdex** combines *Steam* with *dex*, short for *index*. The name reflects
-its purpose: discovering, indexing, and organizing games in your Steam library.
