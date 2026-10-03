@@ -44,25 +44,28 @@ struct ParserConfig {
     extension: Vec<String>,
 }
 
-fn collect_files(path: &PathBuf, files: &mut Vec<PathBuf>) -> io::Result<()> {
+fn collect_files(path: &PathBuf) -> io::Result<Vec<PathBuf>> {
     let metadata = fs::metadata(path)?;
     if !metadata.is_dir() {
         return Err(io::Error::other("path is not a folder"));
     }
 
-    let entries = fs::read_dir(path)?;
-    for entry in entries {
-        let path = entry?.path();
-        let metadata = fs::metadata(&path)?;
+    let files = walkdir::WalkDir::new(path)
+        .max_depth(100)
+        .follow_links(true)
+        .into_iter()
+        .filter_map(|entry| match entry {
+            Ok(entry) if entry.file_type().is_file() => Some(entry.path().to_path_buf()),
+            Ok(_) => None,
+            Err(error) => {
+                let error_path = error.path().unwrap_or(path.as_path());
+                eprintln!("Could not walk '{}': {error}", error_path.display());
+                None
+            }
+        })
+        .collect();
 
-        if metadata.is_dir() {
-            collect_files(&path, files)?;
-        } else if metadata.is_file() {
-            files.push(path);
-        }
-    }
-
-    Ok(())
+    Ok(files)
 }
 
 fn main() {
@@ -112,9 +115,7 @@ fn main() {
                         std::process::exit(2);
                     });
 
-                let mut files: Vec<PathBuf> = Vec::new();
-
-                collect_files(&parser.directory, &mut files).unwrap_or_else(|error| {
+                let files = collect_files(&parser.directory).unwrap_or_else(|error| {
                     eprintln!("Could not collect files: {error}");
                     std::process::exit(1);
                 });
