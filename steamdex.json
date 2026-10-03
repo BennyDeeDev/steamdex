@@ -3,14 +3,34 @@
     {
       "name": "Sample ROM Library",
       "enabled": true,
-      "directory": "test-data/sample-library-rom",
+      "directories": ["test-data/sample-library-rom"],
       "globs": ["*.rom"]
     },
     {
       "name": "Sample EXE Library",
       "enabled": false,
-      "directory": "test-data/sample-library-exe",
+      "directories": ["test-data/sample-library-exe"],
       "globs": ["*.exe"]
+    },
+    {
+      "name": "Sample Combined ROM and EXE Library",
+      "enabled": false,
+      "directories": [
+        "test-data/sample-library-rom",
+        "test-data/sample-library-exe"
+      ],
+      "globs": ["*.rom", "*.exe"]
+    },
+    {
+      "name": "Sample Combined ROM and EXE Library With Errors",
+      "enabled": false,
+      "directories": [
+        "test-data/sample-library-rom",
+        "test-data/sample-library-exe",
+        "test-data/missing-library-for-error-test",
+        "test-data/sample-library-rom/notes.txt"
+      ],
+      "globs": ["*.rom", "*.exe"]
     }
   ]
 }

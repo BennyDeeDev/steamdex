@@ -24,15 +24,18 @@ Each parser's `globs` field is a list of [globset patterns](https://docs.rs/glob
 {
   "name": "Sample ROM Library",
   "enabled": true,
-  "directory": "test-data/sample-library-rom",
+  "directories": ["test-data/sample-library-rom"],
   "globs": ["*.rom", "*.bin"]
 }
 ```
 
-Steamdex recursively walks the configured directory and matches each file's
+Steamdex recursively walks each configured directory and matches each file's
 **filename only** against these patterns. For example, `*.rom` matches ROM
 filenames at any depth; folder names do not affect matching. Patterns are
 case-sensitive. Invalid glob patterns are reported as configuration errors.
+If a configured directory cannot be read or a walk encounters an error,
+Steamdex reports it and continues with other roots, but exits unsuccessfully
+after returning any files it found.
 
 The `enabled` field controls whether a parser runs when you use `steamdex parse`
 without a name. You can still run a disabled parser explicitly with

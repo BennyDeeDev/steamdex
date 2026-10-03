@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{fs, io, path::PathBuf};
 
 use clap::{Parser, Subcommand};
 use globset::{Glob, GlobSetBuilder};
@@ -38,49 +38,79 @@ struct Config {
 struct ParserConfig {
     name: String,
     enabled: bool,
-    directory: PathBuf,
+    directories: Vec<PathBuf>,
     globs: Vec<String>,
 }
 
-fn parse(parser: &ParserConfig) -> Result<(), Box<dyn std::error::Error>> {
+struct ParseOutput {
+    files: Vec<PathBuf>,
+    errors: Vec<Box<dyn std::error::Error>>,
+}
+
+fn parse(parser: &ParserConfig) -> Result<ParseOutput, Box<dyn std::error::Error>> {
+    if parser.directories.is_empty() {
+        return Err("parser has no directories configured".into());
+    }
+
     let mut builder = GlobSetBuilder::new();
     for pattern in &parser.globs {
         builder.add(Glob::new(pattern)?);
     }
     let globs = builder.build()?;
 
-    let metadata = fs::metadata(&parser.directory)?;
-    if !metadata.is_dir() {
-        return Err("path is not a folder".into());
-    }
+    let mut output = ParseOutput {
+        files: Vec::new(),
+        errors: Vec::new(),
+    };
 
-    let files: Vec<PathBuf> = walkdir::WalkDir::new(&parser.directory)
-        .max_depth(100)
-        .follow_links(true)
-        .into_iter()
-        .filter_map(|entry| match entry {
-            Ok(entry) => Some(entry),
-            Err(error) => {
-                let error_path = error.path().unwrap_or(parser.directory.as_path());
-                eprintln!("Could not walk '{}': {error}", error_path.display());
-                None
+    for directory in &parser.directories {
+        match fs::metadata(directory) {
+            Ok(metadata) if metadata.is_dir() => {}
+            Ok(_) => {
+                output.errors.push(
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!("'{}' is not a directory", directory.display()),
+                    )
+                    .into(),
+                );
+                continue;
             }
-        })
-        .filter(|entry| {
-            entry.file_type().is_file()
+            Err(error) => {
+                output.errors.push(
+                    io::Error::new(
+                        error.kind(),
+                        format!("could not inspect '{}': {error}", directory.display()),
+                    )
+                    .into(),
+                );
+                continue;
+            }
+        }
+        for entry in walkdir::WalkDir::new(directory)
+            .max_depth(100)
+            .follow_links(true)
+        {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) => {
+                    output.errors.push(error.into());
+                    continue;
+                }
+            };
+
+            if entry.file_type().is_file()
                 && entry
                     .path()
                     .file_name()
                     .is_some_and(|name| globs.is_match(std::path::Path::new(name)))
-        })
-        .map(|entry| entry.path().to_path_buf())
-        .collect();
-
-    for file in files {
-        println!("{}", file.display());
+            {
+                output.files.push(entry.into_path());
+            }
+        }
     }
 
-    Ok(())
+    Ok(output)
 }
 
 fn main() {
@@ -109,18 +139,26 @@ fn main() {
             if config_json.parsers.is_empty() {
                 println!("No parsers configured.");
             } else {
-                for parser in config_json.parsers.iter() {
+                for (index, parser) in config_json.parsers.iter().enumerate() {
+                    if index > 0 {
+                        println!();
+                    }
                     println!("{}", parser.name);
-                    println!();
-                    println!("Enabled: {}", parser.enabled);
-                    println!("Directory: {}", parser.directory.display());
-                    println!("Globs: {}", parser.globs.join(", "));
-                    println!();
-                    println!("=======================");
+                    println!("  Enabled: {}", parser.enabled);
+                    println!("  Directories:");
+                    if parser.directories.is_empty() {
+                        println!("    (none)");
+                    } else {
+                        for directory in &parser.directories {
+                            println!("    - {}", directory.display());
+                        }
+                    }
+                    println!("  Globs: {}", parser.globs.join(", "));
                 }
             }
         }
         Command::Parse { name } => {
+            //TODO: add rayon to multithread multiple parsers
             if let Some(name) = name {
                 let parser = config_json
                     .parsers
@@ -131,14 +169,19 @@ fn main() {
                         std::process::exit(2);
                     });
 
-                parse(parser).unwrap_or_else(|error| {
-                    eprintln!(
-                        "Could not parse '{}' at '{}': {error}",
-                        parser.name,
-                        parser.directory.display()
-                    );
+                let output = parse(parser).unwrap_or_else(|error| {
+                    eprintln!("Could not parse '{}': {error}", parser.name);
                     std::process::exit(1);
                 });
+                for file in output.files {
+                    println!("{}", file.display());
+                }
+                if !output.errors.is_empty() {
+                    for error in output.errors {
+                        eprintln!("Could not parse '{}': {error}", parser.name);
+                    }
+                    std::process::exit(1);
+                }
             } else {
                 let mut enabled_parsers = config_json
                     .parsers
@@ -150,16 +193,23 @@ fn main() {
                     println!("No enabled parsers configured.");
                 }
 
+                let mut had_errors = false;
                 for parser in enabled_parsers {
                     println!("{}:", parser.name);
-                    parse(parser).unwrap_or_else(|error| {
-                        eprintln!(
-                            "Could not parse '{}' at '{}': {error}",
-                            parser.name,
-                            parser.directory.display()
-                        );
+                    let output = parse(parser).unwrap_or_else(|error| {
+                        eprintln!("Could not parse '{}': {error}", parser.name);
                         std::process::exit(1);
                     });
+                    for file in output.files {
+                        println!("{}", file.display());
+                    }
+                    for error in output.errors {
+                        eprintln!("Could not parse '{}': {error}", parser.name);
+                        had_errors = true;
+                    }
+                }
+                if had_errors {
+                    std::process::exit(1);
                 }
             }
         }
