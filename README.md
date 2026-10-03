@@ -14,7 +14,8 @@ portable, and easy to automate.
 
 1. Build a functional CLI with configuration support.
 2. Add profiles for preconfigured setups, selectors, and game executable lookup.
-3. Add an Iced UI.
+3. Support glob-regex and full SRM Compatibility.
+4. Add an Iced UI.
 
 ## Parser file matching
 

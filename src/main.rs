@@ -38,12 +38,32 @@ struct Config {
 struct ParserConfig {
     name: String,
     enabled: bool,
+    title_from: TitleSource,
     directories: Vec<PathBuf>,
     globs: Vec<String>,
 }
 
-struct ParseOutput {
+#[derive(Deserialize, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+enum TitleSource {
+    RootChildDirectory,
+}
+
+impl TitleSource {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::RootChildDirectory => "root_child_directory",
+        }
+    }
+}
+
+struct ParsedTitles {
+    title: String,
     files: Vec<PathBuf>,
+}
+
+struct ParseOutput {
+    titles: Vec<ParsedTitles>,
     errors: Vec<Box<dyn std::error::Error>>,
 }
 
@@ -59,7 +79,7 @@ fn parse(parser: &ParserConfig) -> Result<ParseOutput, Box<dyn std::error::Error
     let globs = builder.build()?;
 
     let mut output = ParseOutput {
-        files: Vec::new(),
+        titles: Vec::new(),
         errors: Vec::new(),
     };
 
@@ -87,11 +107,12 @@ fn parse(parser: &ParserConfig) -> Result<ParseOutput, Box<dyn std::error::Error
                 continue;
             }
         }
-        for entry in walkdir::WalkDir::new(directory)
-            .max_depth(100)
+        for title_entry in walkdir::WalkDir::new(directory)
+            .min_depth(1)
+            .max_depth(1)
             .follow_links(true)
         {
-            let entry = match entry {
+            let title_entry = match title_entry {
                 Ok(entry) => entry,
                 Err(error) => {
                     output.errors.push(error.into());
@@ -99,13 +120,37 @@ fn parse(parser: &ParserConfig) -> Result<ParseOutput, Box<dyn std::error::Error
                 }
             };
 
-            if entry.file_type().is_file()
-                && entry
-                    .path()
-                    .file_name()
-                    .is_some_and(|name| globs.is_match(std::path::Path::new(name)))
-            {
-                output.files.push(entry.into_path());
+            if title_entry.file_type().is_dir() {
+                let mut parsed_title = ParsedTitles {
+                    title: title_entry.file_name().to_string_lossy().into_owned(),
+                    files: Vec::new(),
+                };
+
+                for file_entry in walkdir::WalkDir::new(title_entry.path())
+                    .max_depth(100)
+                    .follow_links(true)
+                {
+                    let file_entry = match file_entry {
+                        Ok(file_entry) => file_entry,
+                        Err(error) => {
+                            output.errors.push(error.into());
+                            continue;
+                        }
+                    };
+
+                    if file_entry.file_type().is_file()
+                        && file_entry
+                            .path()
+                            .file_name()
+                            .is_some_and(|name| globs.is_match(std::path::Path::new(name)))
+                    {
+                        parsed_title.files.push(file_entry.into_path());
+                    }
+                }
+
+                if !parsed_title.files.is_empty() {
+                    output.titles.push(parsed_title);
+                }
             }
         }
     }
@@ -145,6 +190,7 @@ fn main() {
                     }
                     println!("{}", parser.name);
                     println!("  Enabled: {}", parser.enabled);
+                    println!("  Title from: {}", parser.title_from.as_str());
                     println!("  Directories:");
                     if parser.directories.is_empty() {
                         println!("    (none)");
@@ -173,8 +219,11 @@ fn main() {
                     eprintln!("Could not parse '{}': {error}", parser.name);
                     std::process::exit(1);
                 });
-                for file in output.files {
-                    println!("{}", file.display());
+                for title in output.titles {
+                    println!("{}:", title.title);
+                    for file in title.files {
+                        println!("{}", file.display());
+                    }
                 }
                 if !output.errors.is_empty() {
                     for error in output.errors {
@@ -200,8 +249,11 @@ fn main() {
                         eprintln!("Could not parse '{}': {error}", parser.name);
                         std::process::exit(1);
                     });
-                    for file in output.files {
-                        println!("{}", file.display());
+                    for title in output.titles {
+                        println!("{}:", title.title);
+                        for file in title.files {
+                            println!("{}", file.display());
+                        }
                     }
                     for error in output.errors {
                         eprintln!("Could not parse '{}': {error}", parser.name);
