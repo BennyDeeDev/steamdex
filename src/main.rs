@@ -1,6 +1,7 @@
 use std::{fs, io, path::PathBuf};
 
 use clap::{Parser, Subcommand};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 
 #[derive(Parser)]
@@ -41,10 +42,18 @@ struct Config {
 struct ParserConfig {
     name: String,
     directory: PathBuf,
-    extension: Vec<String>,
+    globs: Vec<String>,
 }
 
-fn collect_files(path: &PathBuf) -> io::Result<Vec<PathBuf>> {
+fn compile_globs(patterns: &[String]) -> Result<GlobSet, globset::Error> {
+    let mut builder = GlobSetBuilder::new();
+    for pattern in patterns {
+        builder.add(Glob::new(pattern)?);
+    }
+    builder.build()
+}
+
+fn collect_files(path: &PathBuf, globs: &GlobSet) -> io::Result<Vec<PathBuf>> {
     let metadata = fs::metadata(path)?;
     if !metadata.is_dir() {
         return Err(io::Error::other("path is not a folder"));
@@ -55,14 +64,21 @@ fn collect_files(path: &PathBuf) -> io::Result<Vec<PathBuf>> {
         .follow_links(true)
         .into_iter()
         .filter_map(|entry| match entry {
-            Ok(entry) if entry.file_type().is_file() => Some(entry.path().to_path_buf()),
-            Ok(_) => None,
+            Ok(entry) => Some(entry),
             Err(error) => {
                 let error_path = error.path().unwrap_or(path.as_path());
                 eprintln!("Could not walk '{}': {error}", error_path.display());
                 None
             }
         })
+        .filter(|entry| {
+            entry.file_type().is_file()
+                && entry
+                    .path()
+                    .file_name()
+                    .is_some_and(|name| globs.is_match(std::path::Path::new(name)))
+        })
+        .map(|entry| entry.path().to_path_buf())
         .collect();
 
     Ok(files)
@@ -97,7 +113,7 @@ fn main() {
                 for parser in config_json.parsers.iter() {
                     println!("{}", parser.name);
                     println!("Directory: {}", parser.directory.display());
-                    println!("Extensions: {}", parser.extension.join(", "));
+                    println!("Globs: {}", parser.globs.join(", "));
                     println!();
                 }
             }
@@ -115,7 +131,12 @@ fn main() {
                         std::process::exit(2);
                     });
 
-                let files = collect_files(&parser.directory).unwrap_or_else(|error| {
+                let globs = compile_globs(&parser.globs).unwrap_or_else(|error| {
+                    eprintln!("Invalid glob for parser '{}': {error}", parser.name);
+                    std::process::exit(1);
+                });
+
+                let files = collect_files(&parser.directory, &globs).unwrap_or_else(|error| {
                     eprintln!("Could not collect files: {error}");
                     std::process::exit(1);
                 });

@@ -3,12 +3,12 @@
     {
       "name": "Sample ROM Library",
       "directory": "test-data/sample-library-rom",
-      "extension": [".rom"]
+      "globs": ["*.rom"]
     },
     {
       "name": "Sample EXE Library",
       "directory": "test-data/sample-library-exe",
-      "extension": [".exe"]
+      "globs": ["*.exe"]
     }
   ]
 }

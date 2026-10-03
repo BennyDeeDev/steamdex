@@ -1,0 +1,1 @@
+This nested file should not match the EXE parser's *.exe glob.
