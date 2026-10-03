@@ -1,7 +1,7 @@
-use std::{fs, io, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use clap::{Parser, Subcommand};
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobSetBuilder};
 use serde::Deserialize;
 
 #[derive(Parser)]
@@ -24,11 +24,7 @@ struct Cli {
 enum Command {
     List,
     Parse {
-        #[arg(required_unless_present = "all")]
         name: Option<String>,
-
-        #[arg(long, conflicts_with = "name")]
-        all: bool,
         //TODO: add preview option
     },
 }
@@ -41,32 +37,31 @@ struct Config {
 #[derive(Deserialize)]
 struct ParserConfig {
     name: String,
+    enabled: bool,
     directory: PathBuf,
     globs: Vec<String>,
 }
 
-fn compile_globs(patterns: &[String]) -> Result<GlobSet, globset::Error> {
+fn parse(parser: &ParserConfig) -> Result<(), Box<dyn std::error::Error>> {
     let mut builder = GlobSetBuilder::new();
-    for pattern in patterns {
+    for pattern in &parser.globs {
         builder.add(Glob::new(pattern)?);
     }
-    builder.build()
-}
+    let globs = builder.build()?;
 
-fn collect_files(path: &PathBuf, globs: &GlobSet) -> io::Result<Vec<PathBuf>> {
-    let metadata = fs::metadata(path)?;
+    let metadata = fs::metadata(&parser.directory)?;
     if !metadata.is_dir() {
-        return Err(io::Error::other("path is not a folder"));
+        return Err("path is not a folder".into());
     }
 
-    let files = walkdir::WalkDir::new(path)
+    let files: Vec<PathBuf> = walkdir::WalkDir::new(&parser.directory)
         .max_depth(100)
         .follow_links(true)
         .into_iter()
         .filter_map(|entry| match entry {
             Ok(entry) => Some(entry),
             Err(error) => {
-                let error_path = error.path().unwrap_or(path.as_path());
+                let error_path = error.path().unwrap_or(parser.directory.as_path());
                 eprintln!("Could not walk '{}': {error}", error_path.display());
                 None
             }
@@ -81,7 +76,11 @@ fn collect_files(path: &PathBuf, globs: &GlobSet) -> io::Result<Vec<PathBuf>> {
         .map(|entry| entry.path().to_path_buf())
         .collect();
 
-    Ok(files)
+    for file in files {
+        println!("{}", file.display());
+    }
+
+    Ok(())
 }
 
 fn main() {
@@ -112,16 +111,17 @@ fn main() {
             } else {
                 for parser in config_json.parsers.iter() {
                     println!("{}", parser.name);
+                    println!();
+                    println!("Enabled: {}", parser.enabled);
                     println!("Directory: {}", parser.directory.display());
                     println!("Globs: {}", parser.globs.join(", "));
                     println!();
+                    println!("=======================");
                 }
             }
         }
-        Command::Parse { name, all } => {
-            if all {
-                println!("Parsing all");
-            } else if let Some(name) = name {
+        Command::Parse { name } => {
+            if let Some(name) = name {
                 let parser = config_json
                     .parsers
                     .iter()
@@ -131,18 +131,35 @@ fn main() {
                         std::process::exit(2);
                     });
 
-                let globs = compile_globs(&parser.globs).unwrap_or_else(|error| {
-                    eprintln!("Invalid glob for parser '{}': {error}", parser.name);
+                parse(parser).unwrap_or_else(|error| {
+                    eprintln!(
+                        "Could not parse '{}' at '{}': {error}",
+                        parser.name,
+                        parser.directory.display()
+                    );
                     std::process::exit(1);
                 });
+            } else {
+                let mut enabled_parsers = config_json
+                    .parsers
+                    .iter()
+                    .filter(|parser| parser.enabled)
+                    .peekable();
 
-                let files = collect_files(&parser.directory, &globs).unwrap_or_else(|error| {
-                    eprintln!("Could not collect files: {error}");
-                    std::process::exit(1);
-                });
+                if enabled_parsers.peek().is_none() {
+                    println!("No enabled parsers configured.");
+                }
 
-                for file in &files {
-                    println!("{}", file.display());
+                for parser in enabled_parsers {
+                    println!("{}:", parser.name);
+                    parse(parser).unwrap_or_else(|error| {
+                        eprintln!(
+                            "Could not parse '{}' at '{}': {error}",
+                            parser.name,
+                            parser.directory.display()
+                        );
+                        std::process::exit(1);
+                    });
                 }
             }
         }

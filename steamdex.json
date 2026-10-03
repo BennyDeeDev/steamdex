@@ -2,11 +2,13 @@
   "parsers": [
     {
       "name": "Sample ROM Library",
+      "enabled": true,
       "directory": "test-data/sample-library-rom",
       "globs": ["*.rom"]
     },
     {
       "name": "Sample EXE Library",
+      "enabled": false,
       "directory": "test-data/sample-library-exe",
       "globs": ["*.exe"]
     }

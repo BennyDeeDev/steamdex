@@ -23,6 +23,7 @@ Each parser's `globs` field is a list of [globset patterns](https://docs.rs/glob
 ```json
 {
   "name": "Sample ROM Library",
+  "enabled": true,
   "directory": "test-data/sample-library-rom",
   "globs": ["*.rom", "*.bin"]
 }
@@ -33,11 +34,17 @@ Steamdex recursively walks the configured directory and matches each file's
 filenames at any depth; folder names do not affect matching. Patterns are
 case-sensitive. Invalid glob patterns are reported as configuration errors.
 
+The `enabled` field controls whether a parser runs when you use `steamdex parse`
+without a name. You can still run a disabled parser explicitly with
+`steamdex parse "Parser Name"`.
+
 ## AI Disclosure
 
-Steamdex's logic is handwritten and reviewed by me. I'm still learning Rust, so
-I use AI to help research and understand code from other projects, along with
-small supporting tasks like drafting error messages, editing Markdown, and
-generating tests. Ludusavi is one of Steamdex's inspirations, and AI has helped
-me explore and understand its code. Feedback from experienced Rustaceans is
-very welcome and greatly appreciated.
+Most of Steamdex's logic is handwritten everything else is reviewed by me.
+I use AI to write trivial logic, research and understand code from other
+projects, and assist with supporting tasks like drafting error messages,
+editing Markdown, and generating tests.
+
+Ludusavi is one of Steamdex's inspirations, and AI has helped me explore and
+understand its code. Feedback from experienced Rustaceans is very welcome and
+greatly appreciated.
