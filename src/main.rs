@@ -1,7 +1,6 @@
-use std::path::PathBuf;
+use std::{fs, io, path::PathBuf};
 
 use clap::{Parser, Subcommand};
-use iced::{Element, widget::text};
 use serde::Deserialize;
 
 #[derive(Parser)]
@@ -17,7 +16,7 @@ struct Cli {
     config: Option<std::path::PathBuf>,
 
     #[command(subcommand)]
-    command: Option<Command>,
+    command: Command,
 }
 
 #[derive(Subcommand)]
@@ -45,7 +44,28 @@ struct ParserConfig {
     extension: Vec<String>,
 }
 
-fn main() -> iced::Result {
+fn collect_files(path: &PathBuf, files: &mut Vec<PathBuf>) -> io::Result<()> {
+    let metadata = fs::metadata(path)?;
+    if !metadata.is_dir() {
+        return Err(io::Error::other("path is not a folder"));
+    }
+
+    let entries = fs::read_dir(path)?;
+    for entry in entries {
+        let path = entry?.path();
+        let metadata = fs::metadata(&path)?;
+
+        if metadata.is_dir() {
+            collect_files(&path, files)?;
+        } else if metadata.is_file() {
+            files.push(path);
+        }
+    }
+
+    Ok(())
+}
+
+fn main() {
     let cli = Cli::parse();
 
     // TODO: use .config here instead of steamdex.json
@@ -67,7 +87,7 @@ fn main() -> iced::Result {
     });
 
     match cli.command {
-        Some(Command::List) => {
+        Command::List => {
             if config_json.parsers.is_empty() {
                 println!("No parsers configured.");
             } else {
@@ -78,10 +98,8 @@ fn main() -> iced::Result {
                     println!();
                 }
             }
-
-            std::process::exit(0)
         }
-        Some(Command::Parse { name, all }) => {
+        Command::Parse { name, all } => {
             if all {
                 println!("Parsing all");
             } else if let Some(name) = name {
@@ -94,32 +112,17 @@ fn main() -> iced::Result {
                         std::process::exit(2);
                     });
 
-                let entries = std::fs::read_dir(&parser.directory).unwrap_or_else(|error| {
-                    eprintln!(
-                        "Could not read directory '{}': {error}",
-                        parser.directory.display()
-                    );
+                let mut files: Vec<PathBuf> = Vec::new();
+
+                collect_files(&parser.directory, &mut files).unwrap_or_else(|error| {
+                    eprintln!("Could not collect files: {error}");
                     std::process::exit(1);
                 });
 
-                for entry in entries {
-                    let entry = entry.unwrap_or_else(|error| {
-                        eprintln!("Could not read a directory entry: {error}");
-                        std::process::exit(1);
-                    });
-
-                    println!("{}", entry.path().display());
+                for file in &files {
+                    println!("{}", file.display());
                 }
             }
-
-            Ok(())
         }
-        None => iced::run(update, view),
     }
-}
-
-fn update(_: &mut (), _: ()) {}
-
-fn view(_: &()) -> Element<'_, ()> {
-    text("Hello World!").into()
 }

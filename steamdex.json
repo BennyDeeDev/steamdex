@@ -9,6 +9,26 @@
       "name": "Sample EXE Library",
       "directory": "test-data/sample-library-exe",
       "extension": [".exe"]
+    },
+    {
+      "name": "Sample ROM Library Symlink",
+      "directory": "test-data/sample-library-rom-symlink",
+      "extension": [".rom"]
+    },
+    {
+      "name": "Sample ROM Library Broken Symlink",
+      "directory": "test-data/sample-library-rom-broken-symlink",
+      "extension": [".rom"]
+    },
+    {
+      "name": "Sample ROM Library Unusual Names and Empty Folders",
+      "directory": "test-data/sample-library-rom-unusual-names",
+      "extension": [".rom"]
+    },
+    {
+      "name": "Sample ROM Library Permission Denied",
+      "directory": "test-data/sample-library-rom-permission-denied",
+      "extension": [".rom"]
     }
   ]
 }
