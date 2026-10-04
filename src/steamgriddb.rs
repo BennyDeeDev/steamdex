@@ -2,21 +2,6 @@ use serde::Deserialize;
 
 pub const API_BASE_URL: &str = "https://www.steamgriddb.com/api/v2";
 
-pub mod endpoints {
-    pub const SEARCH_AUTOCOMPLETE: &str = "/search/autocomplete/{query}";
-    pub const GRIDS_BY_GAME_ID: &str = "/grids/game/{game_id}";
-    pub const HEROES_BY_GAME_ID: &str = "/heroes/game/{game_id}";
-    pub const LOGOS_BY_GAME_ID: &str = "/logos/game/{game_id}";
-    pub const ICONS_BY_GAME_ID: &str = "/icons/game/{game_id}";
-}
-
-pub const STATIC_IMAGE_TYPE: &str = "static";
-pub const NSFW_FILTER: &str = "false";
-pub const HUMOR_FILTER: &str = "false";
-
-pub const TALL_GRID_DIMENSIONS: &[&str] = &["600x900"];
-pub const LONG_GRID_DIMENSIONS: &[&str] = &["460x215", "920x430"];
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ArtworkType {
     Tall,
@@ -26,40 +11,27 @@ pub enum ArtworkType {
     Icon,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct ArtworkEndpoint {
-    pub artwork_type: ArtworkType,
-    pub path_template: &'static str,
-    pub dimensions: &'static [&'static str],
-}
+impl ArtworkType {
+    const TALL_GRID_DIMENSIONS: &[&str] = &["600x900"];
+    const LONG_GRID_DIMENSIONS: &[&str] = &["460x215", "920x430"];
 
-pub const ARTWORK_ENDPOINTS: &[ArtworkEndpoint] = &[
-    ArtworkEndpoint {
-        artwork_type: ArtworkType::Tall,
-        path_template: endpoints::GRIDS_BY_GAME_ID,
-        dimensions: TALL_GRID_DIMENSIONS,
-    },
-    ArtworkEndpoint {
-        artwork_type: ArtworkType::Long,
-        path_template: endpoints::GRIDS_BY_GAME_ID,
-        dimensions: LONG_GRID_DIMENSIONS,
-    },
-    ArtworkEndpoint {
-        artwork_type: ArtworkType::Hero,
-        path_template: endpoints::HEROES_BY_GAME_ID,
-        dimensions: &[],
-    },
-    ArtworkEndpoint {
-        artwork_type: ArtworkType::Logo,
-        path_template: endpoints::LOGOS_BY_GAME_ID,
-        dimensions: &[],
-    },
-    ArtworkEndpoint {
-        artwork_type: ArtworkType::Icon,
-        path_template: endpoints::ICONS_BY_GAME_ID,
-        dimensions: &[],
-    },
-];
+    fn path(&self, game_id: u64) -> String {
+        match self {
+            Self::Tall | Self::Long => format!("/grids/game/{game_id}"),
+            Self::Hero => format!("/heroes/game/{game_id}"),
+            Self::Logo => format!("/logos/game/{game_id}"),
+            Self::Icon => format!("/icons/game/{game_id}"),
+        }
+    }
+
+    fn dimensions(&self) -> Option<&[&str]> {
+        match self {
+            Self::Tall => Some(Self::TALL_GRID_DIMENSIONS),
+            Self::Long => Some(Self::LONG_GRID_DIMENSIONS),
+            Self::Hero | Self::Logo | Self::Icon => None,
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct ApiResponse<T> {
@@ -180,5 +152,45 @@ impl SteamGridDbClient {
         }
 
         Ok(response.data.unwrap_or_default().into_iter().next())
+    }
+
+    pub async fn first_artwork(
+        &self,
+        game_id: u64,
+        artwork_type: ArtworkType,
+    ) -> Result<Option<ArtworkAsset>, Box<dyn std::error::Error>> {
+        let url = format!("{API_BASE_URL}{}", artwork_type.path(game_id));
+        let mut request = self.client.get(url).bearer_auth(&self.api_key);
+
+        if let Some(dimensions) = artwork_type.dimensions() {
+            request = request.query(&[("dimensions", dimensions.join(","))]);
+        }
+
+        let response = request
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<ArtworkListResponse>()
+            .await?;
+
+        if !response.success {
+            let message = response.errors.unwrap_or_default().join("; ");
+            return Err(format!("SteamGridDB artwork request failed: {message}").into());
+        }
+
+        Ok(response.data.unwrap_or_default().into_iter().next())
+    }
+
+    pub async fn download_image(&self, url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let bytes = self
+            .client
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .bytes()
+            .await?;
+
+        Ok(bytes.to_vec())
     }
 }
