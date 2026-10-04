@@ -44,7 +44,7 @@ without a name. You can still run a disabled parser explicitly with
 
 ## AI Disclosure
 
-Most of Steamdex's logic is handwritten everything else is reviewed by me.
+Steamdex's hard parts are handwritten everything else is reviewed by me.
 I use AI to write trivial logic, research and understand code from other
 projects, and assist with supporting tasks like drafting error messages,
 editing Markdown, and generating tests.
