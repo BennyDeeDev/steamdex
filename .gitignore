@@ -1,8 +1,8 @@
 .direnv/
 .rumdl_cache/
 .env
+.cache/
 
 # Added by cargo
 
 /target
-

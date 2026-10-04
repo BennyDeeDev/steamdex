@@ -1,0 +1,1 @@
+This file should not match the Switch parser's ROM globs.

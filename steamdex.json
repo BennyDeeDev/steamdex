@@ -35,6 +35,20 @@
         "test-data/sample-library-rom/notes.txt"
       ],
       "globs": ["*.rom", "*.exe"]
+    },
+    {
+      "name": "Sample Switch Library with Real Game Titles",
+      "enabled": false,
+      "title_from": "root_child_directory",
+      "directories": ["test-data/sample-library-switch"],
+      "globs": ["*.nsp", "*.xci"]
+    },
+    {
+      "name": "Sample PC Bottles Library with Real Game Titles",
+      "enabled": false,
+      "title_from": "root_child_directory",
+      "directories": ["test-data/sample-library-bottles"],
+      "globs": ["my.launcher.bat"]
     }
   ]
 }
