@@ -12,10 +12,12 @@ portable, and easy to automate.
 
 ## Roadmap
 
-1. Build a functional CLI with configuration support.
-2. Add profiles for preconfigured setups, selectors, and game executable lookup.
-3. Support glob-regex and full SRM Compatibility.
-4. Add an Iced UI.
+- [ ] Build a functional CLI with configuration support.
+- [ ] Add local cache.
+- [ ] Add profiles for preconfigured setups, selectors, and game executable lookup.
+- [ ] Support glob-regex and full SRM Compatibility.
+- [ ] Add an Iced UI.
+- [ ] Support SteamCDN as provider.
 
 ## Parser file matching
 
