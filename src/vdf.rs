@@ -1,8 +1,10 @@
-use std::{collections::HashMap, error::Error, fs, path::PathBuf};
+use std::{error::Error, fs, path::PathBuf};
+
+use indexmap::IndexMap;
 
 #[derive(Debug)]
 enum Value {
-    Object(HashMap<String, Value>),
+    Object(IndexMap<String, Value>),
     String(String),
     Int(i32),
 }
@@ -42,8 +44,8 @@ fn read_vdf_i32(input: &mut &[u8]) -> Result<i32, Box<dyn Error>> {
     Ok(value)
 }
 
-fn parse_vdf_object(input: &mut &[u8]) -> Result<HashMap<String, Value>, Box<dyn Error>> {
-    let mut map = HashMap::new();
+fn parse_vdf_object(input: &mut &[u8]) -> Result<IndexMap<String, Value>, Box<dyn Error>> {
+    let mut map = IndexMap::new();
 
     loop {
         let next = read_vdf_byte(input)?;

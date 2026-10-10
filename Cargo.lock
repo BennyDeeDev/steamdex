@@ -1346,6 +1346,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "globset",
+ "indexmap",
  "reqwest",
  "serde",
  "serde_json",
