@@ -3,7 +3,7 @@ use std::{error::Error, fs, path::PathBuf};
 use indexmap::IndexMap;
 
 #[derive(Debug)]
-enum Value {
+pub(crate) enum Value {
     Object(IndexMap<String, Value>),
     String(String),
     Int(i32),
@@ -44,7 +44,7 @@ fn read_vdf_i32(input: &mut &[u8]) -> Result<i32, Box<dyn Error>> {
     Ok(value)
 }
 
-fn parse_vdf_object(input: &mut &[u8]) -> Result<IndexMap<String, Value>, Box<dyn Error>> {
+fn read_vdf_object(input: &mut &[u8]) -> Result<IndexMap<String, Value>, Box<dyn Error>> {
     let mut map = IndexMap::new();
 
     loop {
@@ -57,7 +57,7 @@ fn parse_vdf_object(input: &mut &[u8]) -> Result<IndexMap<String, Value>, Box<dy
         let key = read_vdf_string(input)?;
 
         let value = match next {
-            0x00 => Value::Object(parse_vdf_object(input)?),
+            0x00 => Value::Object(read_vdf_object(input)?),
             0x01 => Value::String(read_vdf_string(input)?),
             0x02 => Value::Int(read_vdf_i32(input)?),
             _ => return Err(format!("Unknown type: {next:#04x}").into()),
@@ -69,8 +69,16 @@ fn parse_vdf_object(input: &mut &[u8]) -> Result<IndexMap<String, Value>, Box<dy
     Ok(map)
 }
 
-pub fn read_vdf(path: &PathBuf) -> Result<(), Box<dyn Error>> {
-    let raw_vdf_bytes = fs::read(path).expect("could not read VDF");
+pub(crate) fn read_vdf_shortcuts(
+    path: &PathBuf,
+) -> Result<IndexMap<String, Value>, Box<dyn Error>> {
+    let raw_vdf_bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(IndexMap::new());
+        }
+        Err(error) => return Err(error.into()),
+    };
 
     let mut input = raw_vdf_bytes.as_slice();
 
@@ -86,10 +94,47 @@ pub fn read_vdf(path: &PathBuf) -> Result<(), Box<dyn Error>> {
         return Err("Expected shortcuts root".into());
     }
 
-    // Parse the numbered shortcut objects
-    let shortcuts = parse_vdf_object(&mut input)?;
+    read_vdf_object(&mut input)
+}
 
-    println!("{shortcuts:#?}");
+fn write_vdf_string(output: &mut Vec<u8>, value: &str) {
+    output.extend_from_slice(value.as_bytes());
+    output.push(0x00);
+}
 
+fn write_vdf_object(output: &mut Vec<u8>, entries: &IndexMap<String, Value>) {
+    for (key, value) in entries {
+        match value {
+            Value::Object(fields) => {
+                output.push(0x00);
+                write_vdf_string(output, key);
+                write_vdf_object(output, fields);
+            }
+            Value::String(value) => {
+                output.push(0x01);
+                write_vdf_string(output, key);
+                write_vdf_string(output, value);
+            }
+            Value::Int(value) => {
+                output.push(0x02);
+                write_vdf_string(output, key);
+                output.extend_from_slice(&value.to_le_bytes());
+            }
+        }
+    }
+
+    output.push(0x08);
+}
+
+pub(crate) fn write_vdf_shortcuts(
+    path: &PathBuf,
+    shortcuts: &IndexMap<String, Value>,
+) -> Result<(), Box<dyn Error>> {
+    let mut output = vec![0x00];
+    write_vdf_string(&mut output, "shortcuts");
+    write_vdf_object(&mut output, shortcuts);
+    output.push(0x08);
+
+    fs::write(path, output)?;
     Ok(())
 }
