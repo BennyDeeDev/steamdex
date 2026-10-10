@@ -10,7 +10,7 @@ mod vdf;
 
 #[tokio::main]
 async fn main() {
-    let path = PathBuf::from("test-data/shortcuts-minimal.vdf");
+    let path = PathBuf::from("test-data/shortcuts.vdf");
     vdf::read_vdf(&path);
     cli::run().await;
 }
