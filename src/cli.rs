@@ -58,15 +58,18 @@ pub(crate) async fn run() {
 }
 
 fn list_command(config: &crate::config::Config) {
+    println!("Steam target:");
+    println!("  Directory: {}", config.steam_target.directory.display());
+    println!("  User data ID: {}", config.steam_target.user_data_id);
+
     if config.parsers.is_empty() {
+        println!();
         println!("No parsers configured.");
         return;
     }
 
-    for (index, parser) in config.parsers.iter().enumerate() {
-        if index > 0 {
-            println!();
-        }
+    for parser in &config.parsers {
+        println!();
         println!("{}", parser.name);
         println!("  Enabled: {}", parser.enabled);
         println!("  Title from: {}", parser.title_from.as_str());
@@ -79,6 +82,27 @@ fn list_command(config: &crate::config::Config) {
             }
         }
         println!("  Globs: {}", parser.globs.join(", "));
+        println!("  Steam shortcut:");
+        println!(
+            "    Executable: {}",
+            parser.steam_shortcut.executable.display()
+        );
+        println!(
+            "    Start directory: {}",
+            parser
+                .steam_shortcut
+                .start_directory
+                .as_deref()
+                .map_or_else(|| "(default)".to_owned(), |path| path.display().to_string())
+        );
+        println!(
+            "    Launch options: {}",
+            parser.steam_shortcut.launch_options
+        );
+        println!(
+            "    Categories: {}",
+            parser.steam_shortcut.steam_categories.join(", ")
+        );
     }
 }
 

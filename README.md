@@ -21,16 +21,40 @@ portable, and easy to automate.
 
 ## Parser file matching
 
-Each parser's `globs` field is a list of [globset patterns](https://docs.rs/globset/latest/globset/#syntax):
+The configuration has a `steam_target` and a list of `parsers`. Each parser
+includes its file-matching rules and a `steam_shortcut` definition:
 
 ```json
 {
-  "name": "Sample ROM Library",
-  "enabled": true,
-  "directories": ["test-data/sample-library-rom"],
-  "globs": ["*.rom", "*.bin"]
+  "steam_target": {
+    "directory": "/path/to/Steam",
+    "user_data_id": "123456789"
+  },
+  "parsers": [
+    {
+      "name": "Sample ROM Library",
+      "enabled": true,
+      "title_from": "root_child_directory",
+      "directories": ["test-data/sample-library-rom"],
+      "globs": ["*.rom", "*.bin"],
+      "steam_shortcut": {
+        "executable": "/path/to/emulator",
+        "start_directory": null,
+        "launch_options": "\"${file_path}\"",
+        "steam_categories": ["ROMs"]
+      }
+    }
+  ]
 }
 ```
+
+`steam_target.directory` points to the Steam installation, and
+`steam_target.user_data_id` identifies the userdata folder. For each parser,
+`steam_shortcut` contains the executable, optional start directory, launch
+options, and Steam categories. `${file_path}` can be used in launch options to
+refer to a matched file.
+
+Each parser's `globs` field is a list of [globset patterns](https://docs.rs/globset/latest/globset/#syntax):
 
 Steamdex recursively walks each configured directory and matches each file's
 **filename only** against these patterns. For example, `*.rom` matches ROM
