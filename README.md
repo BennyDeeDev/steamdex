@@ -21,14 +21,15 @@ portable, and easy to automate.
 
 ## Parser file matching
 
-The configuration has a `steam_target` and a list of `parsers`. Each parser
+The configuration has a `steam` section and a list of `parsers`. Each parser
 includes its file-matching rules and a `steam_shortcut` definition:
 
 ```json
 {
-  "steam_target": {
+  "steam": {
     "directory": "/path/to/Steam",
-    "user_data_id": "123456789"
+    "user_data_id": "123456789",
+    "artwork_directory": ".cache/steamdex/generated-artwork"
   },
   "parsers": [
     {
@@ -41,18 +42,24 @@ includes its file-matching rules and a `steam_shortcut` definition:
         "executable": "/path/to/emulator",
         "start_directory": null,
         "launch_options": "\"${file_path}\"",
-        "steam_categories": ["ROMs"]
+        "categories": ["ROMs"]
       }
     }
   ]
 }
 ```
 
-`steam_target.directory` points to the Steam installation, and
-`steam_target.user_data_id` identifies the userdata folder. For each parser,
-`steam_shortcut` contains the executable, optional start directory, launch
-options, and Steam categories. `${file_path}` can be used in launch options to
-refer to a matched file.
+`steam.directory` points to the Steam installation, and
+`steam.user_data_id` identifies the userdata folder. `steam.artwork_directory`
+is optional; when omitted, artwork is written to
+`<steam directory>/userdata/<user_data_id>/config/grid`. Set it to a directory
+such as `.cache/steamdex/generated-artwork` to inspect downloaded artwork
+without writing it into the Steam installation. Relative artwork directories
+are resolved relative to the current working directory.
+
+For each parser, `steam_shortcut` contains the executable, optional start
+directory, launch options, and `categories`. `${file_path}` can be used in
+launch options to refer to a matched file.
 
 Each parser's `globs` field is a list of [globset patterns](https://docs.rs/globset/latest/globset/#syntax):
 
