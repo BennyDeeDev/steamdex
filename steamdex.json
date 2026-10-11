@@ -1,18 +1,36 @@
 {
+  "steam": {
+    "directory": "/path/to/Steam",
+    "user_data_id": "123456789",
+    "artwork_directory": ".cache/steamdex/generated-artwork",
+    "shortcuts_file": ".cache/steamdex/shortcuts.vdf"
+  },
   "parsers": [
     {
       "name": "Sample ROM Library",
       "enabled": true,
       "title_from": "root_child_directory",
       "directories": ["test-data/sample-library-rom"],
-      "globs": ["*.rom"]
+      "globs": ["*.rom"],
+      "steam_shortcut": {
+        "executable": "/path/to/emulator",
+        "start_directory": null,
+        "launch_options": "\"${file_path}\"",
+        "categories": ["ROMs"]
+      }
     },
     {
       "name": "Sample EXE Library",
       "enabled": false,
       "title_from": "root_child_directory",
       "directories": ["test-data/sample-library-exe"],
-      "globs": ["*.exe"]
+      "globs": ["*.exe"],
+      "steam_shortcut": {
+        "executable": "/path/to/compatibility-layer",
+        "start_directory": null,
+        "launch_options": "run \"${file_path}\"",
+        "categories": ["Windows Games"]
+      }
     },
     {
       "name": "Sample Combined ROM and EXE Library",
@@ -22,7 +40,13 @@
         "test-data/sample-library-rom",
         "test-data/sample-library-exe"
       ],
-      "globs": ["*.rom", "*.exe"]
+      "globs": ["*.rom", "*.exe"],
+      "steam_shortcut": {
+        "executable": "/path/to/launcher",
+        "start_directory": null,
+        "launch_options": "\"${file_path}\"",
+        "categories": ["Games"]
+      }
     },
     {
       "name": "Sample Combined ROM and EXE Library With Errors",
@@ -34,21 +58,39 @@
         "test-data/missing-library-for-error-test",
         "test-data/sample-library-rom/notes.txt"
       ],
-      "globs": ["*.rom", "*.exe"]
+      "globs": ["*.rom", "*.exe"],
+      "steam_shortcut": {
+        "executable": "/path/to/launcher",
+        "start_directory": null,
+        "launch_options": "\"${file_path}\"",
+        "categories": ["Games"]
+      }
     },
     {
       "name": "Sample Switch Library with Real Game Titles",
       "enabled": false,
       "title_from": "root_child_directory",
       "directories": ["test-data/sample-library-switch"],
-      "globs": ["*.nsp", "*.xci"]
+      "globs": ["*.nsp", "*.xci"],
+      "steam_shortcut": {
+        "executable": "/path/to/switch-emulator",
+        "start_directory": null,
+        "launch_options": "-f -g \"${file_path}\"",
+        "categories": ["Switch"]
+      }
     },
     {
       "name": "Sample PC Bottles Library with Real Game Titles",
       "enabled": false,
       "title_from": "root_child_directory",
       "directories": ["test-data/sample-library-bottles"],
-      "globs": ["my.launcher.bat"]
+      "globs": ["my.launcher.bat"],
+      "steam_shortcut": {
+        "executable": "/usr/bin/env",
+        "start_directory": null,
+        "launch_options": "bottles-cli run -e \"${file_path}\"",
+        "categories": ["PC Bottles"]
+      }
     }
   ]
 }

@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 use crate::{
-    config::{self, ConfigLoadError, ParserConfig},
-    parser,
+    config::{self, ConfigLoadError, ParserConfig, SteamConfig},
+    parser, steam,
     steamgriddb::{ArtworkType, SteamGridDbClient},
 };
 
@@ -53,20 +53,33 @@ pub(crate) async fn run() {
 
     match cli.command {
         Command::List => list_command(&config_json),
-        Command::Parse { name } => parse_command(&config_json.parsers, name).await,
+        Command::Parse { name } => {
+            parse_command(&config_json.parsers, &config_json.steam, name).await
+        }
     }
 }
 
 fn list_command(config: &crate::config::Config) {
+    println!("Steam:");
+    println!("  Directory: {}", config.steam.directory.display());
+    println!("  User data ID: {}", config.steam.user_data_id);
+    println!(
+        "  Artwork directory: {}",
+        config.steam.grid_directory().display()
+    );
+    println!(
+        "  Shortcuts file: {}",
+        config.steam.shortcuts_path().display()
+    );
+
     if config.parsers.is_empty() {
+        println!();
         println!("No parsers configured.");
         return;
     }
 
-    for (index, parser) in config.parsers.iter().enumerate() {
-        if index > 0 {
-            println!();
-        }
+    for parser in &config.parsers {
+        println!();
         println!("{}", parser.name);
         println!("  Enabled: {}", parser.enabled);
         println!("  Title from: {}", parser.title_from.as_str());
@@ -79,10 +92,31 @@ fn list_command(config: &crate::config::Config) {
             }
         }
         println!("  Globs: {}", parser.globs.join(", "));
+        println!("  Steam shortcut:");
+        println!(
+            "    Executable: {}",
+            parser.steam_shortcut.executable.display()
+        );
+        println!(
+            "    Start directory: {}",
+            parser
+                .steam_shortcut
+                .start_directory
+                .as_deref()
+                .map_or_else(|| "(default)".to_owned(), |path| path.display().to_string())
+        );
+        println!(
+            "    Launch options: {}",
+            parser.steam_shortcut.launch_options
+        );
+        println!(
+            "    Categories: {}",
+            parser.steam_shortcut.categories.join(", ")
+        );
     }
 }
 
-async fn parse_command(parsers: &[ParserConfig], name: Option<String>) {
+async fn parse_command(parsers: &[ParserConfig], steam_config: &SteamConfig, name: Option<String>) {
     // TODO: add rayon to multithread multiple parsers
 
     if let Some(name) = name {
@@ -99,7 +133,7 @@ async fn parse_command(parsers: &[ParserConfig], name: Option<String>) {
             std::process::exit(1);
         });
 
-        let output = parse_and_lookup_artwork(parser, &sgdb)
+        let output = parse_and_lookup_artwork(parser, steam_config, &sgdb)
             .await
             .unwrap_or_else(|error| {
                 eprintln!("Could not parse '{}': {error}", parser.name);
@@ -127,7 +161,7 @@ async fn parse_command(parsers: &[ParserConfig], name: Option<String>) {
         let mut had_errors = false;
         for parser in enabled_parsers {
             println!("{}:", parser.name);
-            match parse_and_lookup_artwork(parser, &sgdb).await {
+            match parse_and_lookup_artwork(parser, steam_config, &sgdb).await {
                 Ok(output) => {
                     for error in &output.errors {
                         eprintln!("Could not parse '{}': {error}", parser.name);
@@ -150,51 +184,100 @@ async fn parse_command(parsers: &[ParserConfig], name: Option<String>) {
 
 async fn parse_and_lookup_artwork(
     parser_config: &ParserConfig,
+    steam_config: &SteamConfig,
     sgdb: &SteamGridDbClient,
 ) -> Result<parser::ParseOutput, Box<dyn std::error::Error>> {
     let mut output = parser::parse(parser_config)?;
+    let executable = parser_config
+        .steam_shortcut
+        .executable
+        .to_str()
+        .ok_or("Steam shortcut executable path is not valid UTF-8")?;
 
     print_output(&output.titles);
 
-    for title in &output.titles {
+    for title in &mut output.titles {
+        let (_, shortcut_id) = steam::shortcut_app_ids(executable, &title.title);
         let game = match sgdb.search_first_game(&title.title).await {
-            Ok(Some(game)) => game,
+            Ok(Some(game)) => Some(game),
             Ok(None) => {
                 println!("No SteamGridDB match for '{}'.", title.title);
-                continue;
+                None
             }
             Err(error) => {
                 output.errors.push(
                     format!("SteamGridDB search failed for '{}': {error}", title.title).into(),
                 );
-                continue;
+                None
             }
         };
 
-        println!("SteamGridDB match: {} ({})", game.name, game.id);
-        for artwork_type in [
-            ArtworkType::Tall,
-            ArtworkType::Long,
-            ArtworkType::Hero,
-            ArtworkType::Logo,
-            ArtworkType::Icon,
-        ] {
-            match sgdb.first_artwork(game.id, artwork_type).await {
-                Ok(Some(asset)) => {
-                    println!("  {artwork_type:?}: artwork {} — {}", asset.id, asset.url)
-                }
-                Ok(None) => println!("  {artwork_type:?}: no result"),
-                Err(error) => {
-                    output.errors.push(
-                        format!(
-                            "Could not get {artwork_type:?} for '{}': {error}",
-                            title.title
-                        )
-                        .into(),
-                    );
+        if let Some(game) = game {
+            println!("SteamGridDB match: {} ({})", game.name, game.id);
+            for artwork_type in [
+                ArtworkType::Tall,
+                ArtworkType::Long,
+                ArtworkType::Hero,
+                ArtworkType::Logo,
+                ArtworkType::Icon,
+            ] {
+                match sgdb.first_artwork(game.id, artwork_type).await {
+                    Ok(Some(asset)) => {
+                        let bytes = match sgdb.download_image(&asset.url).await {
+                            Ok(bytes) => bytes,
+                            Err(error) => {
+                                output.errors.push(
+                                    format!(
+                                        "Could not download {artwork_type:?} for '{}': {error}",
+                                        title.title
+                                    )
+                                    .into(),
+                                );
+                                continue;
+                            }
+                        };
+
+                        match steam::write_artwork(
+                            steam_config,
+                            shortcut_id,
+                            artwork_type,
+                            asset.mime.as_deref(),
+                            &bytes,
+                        ) {
+                            Ok(path) => {
+                                println!("  {artwork_type:?}: wrote {}", path.display());
+                                if matches!(artwork_type, ArtworkType::Icon) {
+                                    title.icon_path = Some(path);
+                                }
+                            }
+                            Err(error) => output.errors.push(
+                                format!(
+                                    "Could not write {artwork_type:?} for '{}': {error}",
+                                    title.title
+                                )
+                                .into(),
+                            ),
+                        }
+                    }
+                    Ok(None) => println!("  {artwork_type:?}: no result"),
+                    Err(error) => {
+                        output.errors.push(
+                            format!(
+                                "Could not get {artwork_type:?} for '{}': {error}",
+                                title.title
+                            )
+                            .into(),
+                        );
+                    }
                 }
             }
         }
+    }
+
+    if !output.titles.is_empty() {
+        let path = steam_config.shortcuts_path();
+        steam::write_shortcuts(&path, &parser_config.steam_shortcut, &output.titles)?;
+        println!("Wrote shortcuts to {}", path.display());
     }
 
     Ok(output)

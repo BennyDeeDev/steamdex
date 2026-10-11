@@ -7,7 +7,40 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub(crate) struct Config {
+    pub(crate) steam: SteamConfig,
     pub(crate) parsers: Vec<ParserConfig>,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct SteamConfig {
+    pub(crate) directory: PathBuf,
+    pub(crate) user_data_id: String,
+    #[serde(default)]
+    pub(crate) artwork_directory: Option<PathBuf>,
+    #[serde(default)]
+    pub(crate) shortcuts_file: Option<PathBuf>,
+}
+
+impl SteamConfig {
+    pub(crate) fn shortcuts_path(&self) -> PathBuf {
+        self.shortcuts_file.clone().unwrap_or_else(|| {
+            self.directory
+                .join("userdata")
+                .join(&self.user_data_id)
+                .join("config")
+                .join("shortcuts.vdf")
+        })
+    }
+
+    pub(crate) fn grid_directory(&self) -> PathBuf {
+        self.artwork_directory.clone().unwrap_or_else(|| {
+            self.directory
+                .join("userdata")
+                .join(&self.user_data_id)
+                .join("config")
+                .join("grid")
+        })
+    }
 }
 
 #[derive(Deserialize)]
@@ -17,6 +50,15 @@ pub(crate) struct ParserConfig {
     pub(crate) title_from: TitleSource,
     pub(crate) directories: Vec<PathBuf>,
     pub(crate) globs: Vec<String>,
+    pub(crate) steam_shortcut: SteamShortcutConfig,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct SteamShortcutConfig {
+    pub(crate) executable: PathBuf,
+    pub(crate) start_directory: Option<PathBuf>,
+    pub(crate) launch_options: String,
+    pub(crate) categories: Vec<String>,
 }
 
 #[derive(Deserialize, Clone, Copy)]
