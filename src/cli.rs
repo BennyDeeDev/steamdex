@@ -67,6 +67,10 @@ fn list_command(config: &crate::config::Config) {
         "  Artwork directory: {}",
         config.steam.grid_directory().display()
     );
+    println!(
+        "  Shortcuts file: {}",
+        config.steam.shortcuts_path().display()
+    );
 
     if config.parsers.is_empty() {
         println!();
@@ -192,75 +196,88 @@ async fn parse_and_lookup_artwork(
 
     print_output(&output.titles);
 
-    for title in &output.titles {
+    for title in &mut output.titles {
+        let (_, shortcut_id) = steam::shortcut_app_ids(executable, &title.title);
         let game = match sgdb.search_first_game(&title.title).await {
-            Ok(Some(game)) => game,
+            Ok(Some(game)) => Some(game),
             Ok(None) => {
                 println!("No SteamGridDB match for '{}'.", title.title);
-                continue;
+                None
             }
             Err(error) => {
                 output.errors.push(
                     format!("SteamGridDB search failed for '{}': {error}", title.title).into(),
                 );
-                continue;
+                None
             }
         };
 
-        println!("SteamGridDB match: {} ({})", game.name, game.id);
-        let (_, shortcut_id) = steam::shortcut_app_ids(executable, &title.title);
-        for artwork_type in [
-            ArtworkType::Tall,
-            ArtworkType::Long,
-            ArtworkType::Hero,
-            ArtworkType::Logo,
-            ArtworkType::Icon,
-        ] {
-            match sgdb.first_artwork(game.id, artwork_type).await {
-                Ok(Some(asset)) => {
-                    let bytes = match sgdb.download_image(&asset.url).await {
-                        Ok(bytes) => bytes,
-                        Err(error) => {
-                            output.errors.push(
+        if let Some(game) = game {
+            println!("SteamGridDB match: {} ({})", game.name, game.id);
+            for artwork_type in [
+                ArtworkType::Tall,
+                ArtworkType::Long,
+                ArtworkType::Hero,
+                ArtworkType::Logo,
+                ArtworkType::Icon,
+            ] {
+                match sgdb.first_artwork(game.id, artwork_type).await {
+                    Ok(Some(asset)) => {
+                        let bytes = match sgdb.download_image(&asset.url).await {
+                            Ok(bytes) => bytes,
+                            Err(error) => {
+                                output.errors.push(
+                                    format!(
+                                        "Could not download {artwork_type:?} for '{}': {error}",
+                                        title.title
+                                    )
+                                    .into(),
+                                );
+                                continue;
+                            }
+                        };
+
+                        match steam::write_artwork(
+                            steam_config,
+                            shortcut_id,
+                            artwork_type,
+                            asset.mime.as_deref(),
+                            &bytes,
+                        ) {
+                            Ok(path) => {
+                                println!("  {artwork_type:?}: wrote {}", path.display());
+                                if matches!(artwork_type, ArtworkType::Icon) {
+                                    title.icon_path = Some(path);
+                                }
+                            }
+                            Err(error) => output.errors.push(
                                 format!(
-                                    "Could not download {artwork_type:?} for '{}': {error}",
+                                    "Could not write {artwork_type:?} for '{}': {error}",
                                     title.title
                                 )
                                 .into(),
-                            );
-                            continue;
+                            ),
                         }
-                    };
-
-                    match steam::write_artwork(
-                        steam_config,
-                        shortcut_id,
-                        artwork_type,
-                        asset.mime.as_deref(),
-                        &bytes,
-                    ) {
-                        Ok(path) => println!("  {artwork_type:?}: wrote {}", path.display()),
-                        Err(error) => output.errors.push(
+                    }
+                    Ok(None) => println!("  {artwork_type:?}: no result"),
+                    Err(error) => {
+                        output.errors.push(
                             format!(
-                                "Could not write {artwork_type:?} for '{}': {error}",
+                                "Could not get {artwork_type:?} for '{}': {error}",
                                 title.title
                             )
                             .into(),
-                        ),
+                        );
                     }
-                }
-                Ok(None) => println!("  {artwork_type:?}: no result"),
-                Err(error) => {
-                    output.errors.push(
-                        format!(
-                            "Could not get {artwork_type:?} for '{}': {error}",
-                            title.title
-                        )
-                        .into(),
-                    );
                 }
             }
         }
+    }
+
+    if !output.titles.is_empty() {
+        let path = steam_config.shortcuts_path();
+        steam::write_shortcuts(&path, &parser_config.steam_shortcut, &output.titles)?;
+        println!("Wrote shortcuts to {}", path.display());
     }
 
     Ok(output)

@@ -7,6 +7,7 @@ use crate::config::ParserConfig;
 pub(crate) struct ParsedTitles {
     pub(crate) title: String,
     pub(crate) files: Vec<PathBuf>,
+    pub(crate) icon_path: Option<PathBuf>,
 }
 
 pub(crate) struct ParseOutput {
@@ -72,6 +73,7 @@ pub(crate) fn parse(parser: &ParserConfig) -> Result<ParseOutput, Box<dyn std::e
                 let mut parsed_title = ParsedTitles {
                     title: title_entry.file_name().to_string_lossy().into_owned(),
                     files: Vec::new(),
+                    icon_path: None,
                 };
 
                 for file_entry in walkdir::WalkDir::new(title_entry.path())

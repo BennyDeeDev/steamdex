@@ -29,7 +29,8 @@ includes its file-matching rules and a `steam_shortcut` definition:
   "steam": {
     "directory": "/path/to/Steam",
     "user_data_id": "123456789",
-    "artwork_directory": ".cache/steamdex/generated-artwork"
+    "artwork_directory": ".cache/steamdex/generated-artwork",
+    "shortcuts_file": ".cache/steamdex/shortcuts.vdf"
   },
   "parsers": [
     {
@@ -56,6 +57,13 @@ is optional; when omitted, artwork is written to
 such as `.cache/steamdex/generated-artwork` to inspect downloaded artwork
 without writing it into the Steam installation. Relative artwork directories
 are resolved relative to the current working directory.
+
+`steam.shortcuts_file` is also optional and defaults to
+`<steam directory>/userdata/<user_data_id>/config/shortcuts.vdf`.
+The example writes shortcuts and artwork under `.cache/steamdex/` for local
+inspection. To start from the large fixture, copy `test-data/shortcuts.vdf`
+to `.cache/steamdex/shortcuts.vdf` before parsing. Matching shortcuts (same
+executable and name) are replaced; other shortcuts are preserved.
 
 For each parser, `steam_shortcut` contains the executable, optional start
 directory, launch options, and `categories`. `${file_path}` can be used in
