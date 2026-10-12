@@ -1,4 +1,5 @@
 use std::{
+    collections::{HashMap, HashSet},
     error::Error,
     fs,
     path::{Path, PathBuf},
@@ -120,44 +121,49 @@ fn build_shortcut(
 pub(crate) fn write_shortcuts(
     path: &Path,
     config: &SteamShortcutConfig,
-    games: &[ParsedTitles],
+    titles: &[ParsedTitles],
 ) -> Result<(), Box<dyn Error>> {
-    let path = path.to_path_buf();
-    let mut shortcuts = vdf::read_vdf_shortcuts(&path)?;
+    let mut shortcuts = vdf::read_vdf_shortcuts(path)?;
+    let mut slots_by_shortcut = HashMap::new();
+    for (slot, shortcut) in &shortcuts {
+        let Value::Object(fields) = shortcut else {
+            continue;
+        };
+        let (Some(exe), Some(appname)) = (
+            get_string_field(fields, "exe"),
+            get_string_field(fields, "appname"),
+        ) else {
+            continue;
+        };
 
-    for game in games {
-        let fields = build_shortcut(config, game)?;
+        slots_by_shortcut
+            .entry((exe.to_owned(), appname.to_owned()))
+            .or_insert_with(|| slot.clone());
+    }
+    let mut highest_slot = shortcuts
+        .keys()
+        .filter_map(|slot| slot.parse::<u64>().ok())
+        .max();
+
+    for title in titles {
+        let fields = build_shortcut(config, title)?;
 
         let exe = get_string_field(&fields, "exe").ok_or("New shortcut is missing exe")?;
         let appname =
             get_string_field(&fields, "appname").ok_or("New shortcut is missing appname")?;
 
-        let mut matching_slot = None;
-        for (slot, shortcut) in &shortcuts {
-            let Value::Object(old_fields) = shortcut else {
-                continue;
-            };
-
-            let old_exe = get_string_field(old_fields, "exe");
-            let old_appname = get_string_field(old_fields, "appname");
-            if old_exe == Some(exe) && old_appname == Some(appname) {
-                matching_slot = Some(slot.clone());
-                break;
-            }
-        }
-
-        let slot = match matching_slot {
-            Some(slot) => slot,
+        let key = (exe.to_owned(), appname.to_owned());
+        let slot = match slots_by_shortcut.get(&key) {
+            Some(slot) => slot.clone(),
             None => {
-                let highest_slot = shortcuts
-                    .keys()
-                    .filter_map(|slot| slot.parse::<u64>().ok())
-                    .max();
                 let next_slot = match highest_slot {
                     Some(slot) => slot.checked_add(1).ok_or("Shortcut slot overflow")?,
                     None => 0,
                 };
-                next_slot.to_string()
+                highest_slot = Some(next_slot);
+                let slot = next_slot.to_string();
+                slots_by_shortcut.insert(key, slot.clone());
+                slot
             }
         };
 
@@ -170,5 +176,42 @@ pub(crate) fn write_shortcuts(
     {
         fs::create_dir_all(parent)?;
     }
-    vdf::write_vdf_shortcuts(&path, &shortcuts)
+
+    vdf::write_vdf_shortcuts(path, &shortcuts)
+}
+
+pub(crate) fn delete_shortcuts(
+    path: &Path,
+    config: &SteamShortcutConfig,
+    titles: &[ParsedTitles],
+) -> Result<(), Box<dyn Error>> {
+    let mut shortcuts = vdf::read_vdf_shortcuts(path)?;
+
+    let exe = config
+        .executable
+        .to_str()
+        .ok_or("Steam shortcut executable path is not valid UTF-8")?;
+
+    let title_names: HashSet<&str> = titles.iter().map(|title| title.title.as_str()).collect();
+    let original_len = shortcuts.len();
+    shortcuts.retain(|_, shortcut| {
+        let Value::Object(fields) = shortcut else {
+            return true;
+        };
+
+        if get_string_field(fields, "exe") != Some(exe) {
+            return true;
+        }
+
+        let matching_title =
+            get_string_field(fields, "appname").is_some_and(|name| title_names.contains(name));
+
+        !matching_title
+    });
+
+    if shortcuts.len() == original_len {
+        return Ok(());
+    }
+
+    vdf::write_vdf_shortcuts(path, &shortcuts)
 }

@@ -30,6 +30,9 @@ enum Command {
         name: Option<String>,
         // TODO: add preview option
     },
+    Delete {
+        name: Option<String>, // TODO: add preview option
+    },
 }
 
 pub(crate) async fn run() {
@@ -56,6 +59,7 @@ pub(crate) async fn run() {
         Command::Parse { name } => {
             parse_command(&config_json.parsers, &config_json.steam, name).await
         }
+        Command::Delete { name } => delete_command(&config_json.parsers, &config_json.steam, name),
     }
 }
 
@@ -133,7 +137,7 @@ async fn parse_command(parsers: &[ParserConfig], steam_config: &SteamConfig, nam
             std::process::exit(1);
         });
 
-        let output = parse_and_lookup_artwork(parser, steam_config, &sgdb)
+        let output = parse_and_write_shortcuts(parser, steam_config, &sgdb)
             .await
             .unwrap_or_else(|error| {
                 eprintln!("Could not parse '{}': {error}", parser.name);
@@ -161,7 +165,7 @@ async fn parse_command(parsers: &[ParserConfig], steam_config: &SteamConfig, nam
         let mut had_errors = false;
         for parser in enabled_parsers {
             println!("{}:", parser.name);
-            match parse_and_lookup_artwork(parser, steam_config, &sgdb).await {
+            match parse_and_write_shortcuts(parser, steam_config, &sgdb).await {
                 Ok(output) => {
                     for error in &output.errors {
                         eprintln!("Could not parse '{}': {error}", parser.name);
@@ -182,7 +186,63 @@ async fn parse_command(parsers: &[ParserConfig], steam_config: &SteamConfig, nam
     }
 }
 
-async fn parse_and_lookup_artwork(
+fn delete_command(parsers: &[ParserConfig], steam_config: &SteamConfig, name: Option<String>) {
+    if let Some(name) = name {
+        let parser = parsers
+            .iter()
+            .find(|parser| parser.name == name)
+            .unwrap_or_else(|| {
+                eprintln!("No parser named '{name}' in the config.");
+                std::process::exit(2);
+            });
+
+        parse_and_delete_shortcuts(parser, steam_config).unwrap_or_else(|error| {
+            eprintln!("Could not delete shortcuts for '{}': {error}", parser.name);
+            std::process::exit(1);
+        });
+    } else {
+        if parsers.is_empty() {
+            println!("No parsers configured.");
+            return;
+        }
+
+        let mut had_errors = false;
+        for parser in parsers {
+            println!("{}:", parser.name);
+            if let Err(error) = parse_and_delete_shortcuts(parser, steam_config) {
+                eprintln!("Could not delete shortcuts for '{}': {error}", parser.name);
+                had_errors = true;
+            }
+        }
+        if had_errors {
+            std::process::exit(1);
+        }
+    }
+}
+
+fn parse_and_delete_shortcuts(
+    parser_config: &ParserConfig,
+    steam_config: &SteamConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let output = parser::parse(parser_config)?;
+    for error in &output.errors {
+        eprintln!("Could not parse '{}': {error}", parser_config.name);
+    }
+
+    if !output.titles.is_empty() {
+        let path = steam_config.shortcuts_path();
+        steam::delete_shortcuts(&path, &parser_config.steam_shortcut, &output.titles)?;
+        println!("Processed shortcut deletion at {}", path.display());
+    }
+
+    if !output.errors.is_empty() {
+        return Err(format!("Parser '{}' encountered errors", parser_config.name).into());
+    }
+
+    Ok(())
+}
+
+async fn parse_and_write_shortcuts(
     parser_config: &ParserConfig,
     steam_config: &SteamConfig,
     sgdb: &SteamGridDbClient,
@@ -197,7 +257,6 @@ async fn parse_and_lookup_artwork(
     print_output(&output.titles);
 
     for title in &mut output.titles {
-        let (_, shortcut_id) = steam::shortcut_app_ids(executable, &title.title);
         let game = match sgdb.search_first_game(&title.title).await {
             Ok(Some(game)) => Some(game),
             Ok(None) => {
@@ -213,6 +272,8 @@ async fn parse_and_lookup_artwork(
         };
 
         if let Some(game) = game {
+            let (_, shortcut_id) = steam::shortcut_app_ids(executable, &title.title);
+
             println!("SteamGridDB match: {} ({})", game.name, game.id);
             for artwork_type in [
                 ArtworkType::Tall,

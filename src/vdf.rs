@@ -1,4 +1,4 @@
-use std::{error::Error, fs, path::PathBuf};
+use std::{error::Error, fs, path::Path};
 
 use indexmap::IndexMap;
 
@@ -69,9 +69,7 @@ fn read_vdf_object(input: &mut &[u8]) -> Result<IndexMap<String, Value>, Box<dyn
     Ok(map)
 }
 
-pub(crate) fn read_vdf_shortcuts(
-    path: &PathBuf,
-) -> Result<IndexMap<String, Value>, Box<dyn Error>> {
+pub(crate) fn read_vdf_shortcuts(path: &Path) -> Result<IndexMap<String, Value>, Box<dyn Error>> {
     let raw_vdf_bytes = match fs::read(path) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -127,7 +125,7 @@ fn write_vdf_object(output: &mut Vec<u8>, entries: &IndexMap<String, Value>) {
 }
 
 pub(crate) fn write_vdf_shortcuts(
-    path: &PathBuf,
+    path: &Path,
     shortcuts: &IndexMap<String, Value>,
 ) -> Result<(), Box<dyn Error>> {
     let mut output = vec![0x00];

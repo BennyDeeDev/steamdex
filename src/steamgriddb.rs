@@ -40,69 +40,19 @@ pub struct ApiResponse<T> {
     pub data: Option<T>,
     #[serde(default)]
     pub errors: Option<Vec<String>>,
-    #[serde(default)]
-    pub page: Option<u32>,
-    #[serde(default)]
-    pub total: Option<u32>,
-    #[serde(default)]
-    pub limit: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct GameSearchResult {
     pub id: u64,
     pub name: String,
-    #[serde(default)]
-    pub types: Vec<String>,
-    #[serde(default)]
-    pub verified: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ArtworkAsset {
-    pub id: u64,
     pub url: String,
     #[serde(default)]
-    pub thumb: Option<String>,
-    #[serde(default)]
     pub mime: Option<String>,
-    #[serde(default)]
-    pub width: Option<u32>,
-    #[serde(default)]
-    pub height: Option<u32>,
-    #[serde(default)]
-    pub score: Option<i64>,
-    #[serde(default)]
-    pub style: Option<String>,
-    #[serde(default)]
-    pub nsfw: Option<bool>,
-    #[serde(default)]
-    pub humor: Option<bool>,
-    #[serde(default)]
-    pub notes: Option<String>,
-    #[serde(default)]
-    pub language: Option<String>,
-    #[serde(default)]
-    pub tags: Vec<String>,
-    #[serde(default)]
-    pub lock: Option<bool>,
-    #[serde(default)]
-    pub epilepsy: Option<bool>,
-    #[serde(default)]
-    pub upvotes: Option<u64>,
-    #[serde(default)]
-    pub downvotes: Option<u64>,
-    #[serde(default)]
-    pub author: Option<ArtworkAuthor>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ArtworkAuthor {
-    pub name: String,
-    #[serde(default)]
-    pub steam64: Option<String>,
-    #[serde(default)]
-    pub avatar: Option<String>,
 }
 
 pub type GameSearchResponse = ApiResponse<Vec<GameSearchResult>>;
