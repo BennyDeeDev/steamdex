@@ -28,7 +28,9 @@ enum Command {
     List,
     Parse {
         name: Option<String>,
-        // TODO: add preview option
+        /// Show discovered titles, files, and SteamGridDB matches without writing shortcuts or artwork.
+        #[arg(long)]
+        preview: bool,
     },
     Delete {
         name: Option<String>, // TODO: add preview option
@@ -56,8 +58,8 @@ pub(crate) async fn run() {
 
     match cli.command {
         Command::List => list_command(&config_json),
-        Command::Parse { name } => {
-            parse_command(&config_json.parsers, &config_json.steam, name).await
+        Command::Parse { name, preview } => {
+            parse_command(&config_json.parsers, &config_json.steam, name, preview).await
         }
         Command::Delete { name } => delete_command(&config_json.parsers, &config_json.steam, name),
     }
@@ -120,9 +122,12 @@ fn list_command(config: &crate::config::Config) {
     }
 }
 
-async fn parse_command(parsers: &[ParserConfig], steam_config: &SteamConfig, name: Option<String>) {
-    // TODO: add rayon to multithread multiple parsers
-
+async fn parse_command(
+    parsers: &[ParserConfig],
+    steam_config: &SteamConfig,
+    name: Option<String>,
+    preview: bool,
+) {
     if let Some(name) = name {
         let parser = parsers
             .iter()
@@ -136,6 +141,16 @@ async fn parse_command(parsers: &[ParserConfig], steam_config: &SteamConfig, nam
             eprintln!("Could not initialize SteamGridDB: {error}");
             std::process::exit(1);
         });
+
+        if preview {
+            parse_and_preview_shortcuts(parser, steam_config, &sgdb)
+                .await
+                .unwrap_or_else(|error| {
+                    eprintln!("Could not preview '{}': {error}", parser.name);
+                    std::process::exit(1);
+                });
+            return;
+        }
 
         let output = parse_and_write_shortcuts(parser, steam_config, &sgdb)
             .await
@@ -161,6 +176,20 @@ async fn parse_command(parsers: &[ParserConfig], steam_config: &SteamConfig, nam
             eprintln!("Could not initialize SteamGridDB: {error}");
             std::process::exit(1);
         });
+
+        if preview {
+            let mut had_errors = false;
+            for parser in enabled_parsers {
+                if let Err(error) = parse_and_preview_shortcuts(parser, steam_config, &sgdb).await {
+                    eprintln!("Could not preview '{}': {error}", parser.name);
+                    had_errors = true;
+                }
+            }
+            if had_errors {
+                std::process::exit(1);
+            }
+            return;
+        }
 
         let mut had_errors = false;
         for parser in enabled_parsers {
@@ -218,6 +247,71 @@ fn delete_command(parsers: &[ParserConfig], steam_config: &SteamConfig, name: Op
             std::process::exit(1);
         }
     }
+}
+
+async fn parse_and_preview_shortcuts(
+    parser_config: &ParserConfig,
+    steam_config: &SteamConfig,
+    sgdb: &SteamGridDbClient,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Preview: {}", parser_config.name);
+
+    let mut output = parser::parse(parser_config)?;
+
+    if output.titles.is_empty() {
+        println!("  No matching titles found.");
+    }
+
+    for title in &output.titles {
+        println!("\n{}:", title.title);
+        for file in &title.files {
+            println!("  File: {}", file.display());
+        }
+
+        match sgdb.search_first_game(&title.title).await {
+            Ok(Some(game)) => {
+                println!("  SteamGridDB: {} (ID: {})", game.name, game.id);
+            }
+            Ok(None) => {
+                println!("  SteamGridDB: no match");
+            }
+            Err(error) => {
+                println!("  SteamGridDB: lookup failed");
+                output.errors.push(
+                    format!("SteamGridDB search failed for '{}': {error}", title.title).into(),
+                );
+            }
+        }
+    }
+
+    println!();
+    for error in &output.errors {
+        eprintln!("Could not preview '{}': {error}", parser_config.name);
+    }
+
+    let file_count: usize = output.titles.iter().map(|title| title.files.len()).sum();
+
+    println!(
+        "Found {} titles, {} matching files, {} errors.",
+        output.titles.len(),
+        file_count,
+        output.errors.len(),
+    );
+    println!(
+        "Target shortcuts file: {}",
+        steam_config.shortcuts_path().display(),
+    );
+
+    if !output.errors.is_empty() {
+        return Err(format!(
+            "Preview for '{}' encountered {} error(s)",
+            parser_config.name,
+            output.errors.len(),
+        )
+        .into());
+    }
+
+    Ok(())
 }
 
 fn parse_and_delete_shortcuts(
@@ -348,7 +442,7 @@ fn print_output(titles: &[parser::ParsedTitles]) {
     for title in titles {
         println!("{}:", title.title);
         for file in &title.files {
-            println!("{}", file.display());
+            println!("  {}", file.display());
         }
     }
 }
