@@ -133,6 +133,11 @@ pub(crate) fn write_vdf_shortcuts(
     write_vdf_object(&mut output, shortcuts);
     output.push(0x08);
 
-    fs::write(path, output)?;
+    fs::write(path, output).map_err(|error| {
+        format!(
+            "Could not write shortcuts file '{}': {error}",
+            path.display()
+        )
+    })?;
     Ok(())
 }

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use serde::Deserialize;
 
 pub const API_BASE_URL: &str = "https://www.steamgriddb.com/api/v2";
@@ -9,6 +11,18 @@ pub enum ArtworkType {
     Hero,
     Logo,
     Icon,
+}
+
+impl fmt::Display for ArtworkType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Tall => "Portrait grid",
+            Self::Long => "Landscape grid",
+            Self::Hero => "Hero",
+            Self::Logo => "Logo",
+            Self::Icon => "Icon",
+        })
+    }
 }
 
 impl ArtworkType {
@@ -66,7 +80,7 @@ pub struct SteamGridDbClient {
 impl SteamGridDbClient {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let api_key = std::env::var("STEAMGRIDDB_API_KEY").map_err(|_| {
-            "STEAMGRIDDB_API_KEY is not set. Set it in the environment before requesting artwork."
+            "STEAMGRIDDB_API_KEY is not set. Set it in the environment before using SteamGridDB."
         })?;
 
         Ok(Self {

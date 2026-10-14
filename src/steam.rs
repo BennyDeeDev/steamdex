@@ -49,10 +49,16 @@ pub(crate) fn write_artwork(
 
     let artwork_id = shortcut_id as u32;
     let grid_directory = steam.grid_directory();
-    fs::create_dir_all(&grid_directory)?;
+    fs::create_dir_all(&grid_directory).map_err(|error| {
+        format!(
+            "Could not create artwork directory '{}': {error}",
+            grid_directory.display()
+        )
+    })?;
 
     let path = grid_directory.join(format!("{artwork_id}{suffix}.{extension}"));
-    fs::write(&path, bytes)?;
+    fs::write(&path, bytes)
+        .map_err(|error| format!("Could not write artwork '{}': {error}", path.display()))?;
     Ok(path)
 }
 
@@ -123,7 +129,12 @@ pub(crate) fn write_shortcuts(
     config: &SteamShortcutConfig,
     titles: &[ParsedTitles],
 ) -> Result<(), Box<dyn Error>> {
-    let mut shortcuts = vdf::read_vdf_shortcuts(path)?;
+    let mut shortcuts = vdf::read_vdf_shortcuts(path).map_err(|error| {
+        format!(
+            "Could not load shortcuts file '{}': {error}",
+            path.display()
+        )
+    })?;
     let mut slots_by_shortcut = HashMap::new();
     for (slot, shortcut) in &shortcuts {
         let Value::Object(fields) = shortcut else {
@@ -146,7 +157,8 @@ pub(crate) fn write_shortcuts(
         .max();
 
     for title in titles {
-        let fields = build_shortcut(config, title)?;
+        let fields = build_shortcut(config, title)
+            .map_err(|error| format!("Could not build shortcut for '{}': {error}", title.title))?;
 
         let exe = get_string_field(&fields, "exe").ok_or("New shortcut is missing exe")?;
         let appname =
@@ -174,7 +186,12 @@ pub(crate) fn write_shortcuts(
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
     {
-        fs::create_dir_all(parent)?;
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "Could not create shortcuts directory '{}': {error}",
+                parent.display()
+            )
+        })?;
     }
 
     vdf::write_vdf_shortcuts(path, &shortcuts)
@@ -185,7 +202,12 @@ pub(crate) fn delete_shortcuts(
     config: &SteamShortcutConfig,
     titles: &[ParsedTitles],
 ) -> Result<(), Box<dyn Error>> {
-    let mut shortcuts = vdf::read_vdf_shortcuts(path)?;
+    let mut shortcuts = vdf::read_vdf_shortcuts(path).map_err(|error| {
+        format!(
+            "Could not load shortcuts file '{}': {error}",
+            path.display()
+        )
+    })?;
 
     let exe = config
         .executable
