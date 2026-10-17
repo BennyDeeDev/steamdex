@@ -1,10 +1,7 @@
 # Steamdex
 
-**Steamdex** is a cross-platform game library manager written in Rust, designed
+**Steamdex** is a cross-platform steam library manager written in Rust, designed
 as a declarative alternative to Steam ROM Manager.
-
-It discovers games and ROMs using configurable parsers and integrates them into
-your Steam library as non-Steam shortcuts, complete with metadata and artwork.
 
 Rather than relying on GUI-defined parsing rules, Steamdex puts declarative
 configuration first, making game discovery and library management reproducible,
@@ -29,8 +26,6 @@ includes its file-matching rules and a `steam_shortcut` definition:
   "steam": {
     "directory": "/path/to/Steam",
     "user_data_id": "123456789",
-    "artwork_directory": ".cache/steamdex/generated-artwork",
-    "shortcuts_file": ".cache/steamdex/shortcuts.vdf"
   },
   "parsers": [
     {
@@ -50,38 +45,7 @@ includes its file-matching rules and a `steam_shortcut` definition:
 }
 ```
 
-`steam.directory` points to the Steam installation, and
-`steam.user_data_id` identifies the userdata folder. `steam.artwork_directory`
-is optional; when omitted, artwork is written to
-`<steam directory>/userdata/<user_data_id>/config/grid`. Set it to a directory
-such as `.cache/steamdex/generated-artwork` to inspect downloaded artwork
-without writing it into the Steam installation. Relative artwork directories
-are resolved relative to the current working directory.
-
-`steam.shortcuts_file` is also optional and defaults to
-`<steam directory>/userdata/<user_data_id>/config/shortcuts.vdf`.
-The example writes shortcuts and artwork under `.cache/steamdex/` for local
-inspection. To start from the large fixture, copy `test-data/shortcuts.vdf`
-to `.cache/steamdex/shortcuts.vdf` before parsing. Matching shortcuts (same
-executable and name) are replaced; other shortcuts are preserved.
-
-For each parser, `steam_shortcut` contains the executable, optional start
-directory, launch options, and `categories`. `${file_path}` can be used in
-launch options to refer to a matched file.
-
-Each parser's `globs` field is a list of [globset patterns](https://docs.rs/globset/latest/globset/#syntax):
-
-Steamdex recursively walks each configured directory and matches each file's
-**filename only** against these patterns. For example, `*.rom` matches ROM
-filenames at any depth; folder names do not affect matching. Patterns are
-case-sensitive. Invalid glob patterns are reported as configuration errors.
-If a configured directory cannot be read or a walk encounters an error,
-Steamdex reports it and continues with other roots, but exits unsuccessfully
-after returning any files it found.
-
-The `enabled` field controls whether a parser runs when you use `steamdex parse`
-without a name. You can still run a disabled parser explicitly with
-`steamdex parse "Parser Name"`.
+Each parser's `globs` field is a list of [globset patterns](https://docs.rs/globset/latest/globset/#syntax).
 
 ## AI Disclosure
 
