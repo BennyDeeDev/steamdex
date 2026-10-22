@@ -1,56 +1,39 @@
 # Steamdex
 
-**Steamdex** is a cross-platform steam library manager written in Rust, designed
-as a declarative alternative to Steam ROM Manager.
+Steamdex is a declarative Steam library manager for ROMs and non-Steam apps, written in Rust. Configure shortcuts in JSON instead of using Steam ROM Manager's GUI rules.
 
-Rather than relying on GUI-defined parsing rules, Steamdex puts declarative
-configuration first, making game discovery and library management reproducible,
-portable, and easy to automate.
+## Installation
 
-## Roadmap
+### Nix flake (recommended)
 
-- [ ] Build a functional CLI with configuration support.
-- [ ] Add local cache.
-- [ ] Add profiles for preconfigured setups, selectors, and game executable lookup.
-- [ ] Support glob-regex and full SRM Compatibility.
-- [ ] Add an Iced UI.
-- [ ] Support SteamCDN as provider.
+Run directly:
 
-## Parser file matching
-
-The configuration has a `steam` section and optional `parsers` and `apps` lists.
-Parsers discover titles from files; apps declare shortcuts directly. Each parser
-includes its file-matching rules and a `steam_shortcut` definition:
-
-```json
-{
-  "steam": {
-    "directory": "/path/to/Steam",
-    "user_data_id": "123456789"
-  },
-  "parsers": [
-    {
-      "name": "Sample ROM Library",
-      "enabled": true,
-      "title_from": "root_child_directory",
-      "directories": ["test-data/sample-library-rom"],
-      "globs": ["*.rom", "*.bin"],
-      "steam_shortcut": {
-        "executable": "/path/to/emulator",
-        "start_directory": null,
-        "launch_options": "\"${file_path}\"",
-        "categories": ["ROMs"]
-      }
-    }
-  ]
-}
+```sh
+nix run github:BennyDeeDev/steamdex -- --help
 ```
 
-Each parser's `globs` field is a list of [globset patterns](https://docs.rs/globset/latest/globset/#syntax).
+Or install it:
 
-## Explicit apps
+```sh
+nix profile install github:BennyDeeDev/steamdex
+```
 
-Declare apps directly in the top-level `apps` list in the same configuration file:
+To build the flake locally, run `nix build` from a checkout. The executable will be at `./result/bin/steamdex`.
+
+### Build from source
+
+Requires Rust and Cargo.
+
+```sh
+git clone https://github.com/BennyDeeDev/steamdex.git
+cd steamdex
+cargo build --release
+./target/release/steamdex --help
+```
+
+## Configuration
+
+Create `~/.config/steamdex/config.json` (or `$XDG_CONFIG_HOME/steamdex/config.json`):
 
 ```json
 {
@@ -67,29 +50,31 @@ Declare apps directly in the top-level `apps` list in the same configuration fil
         "categories": ["Media"]
       }
     }
+  ],
+  "parsers": [
+    {
+      "name": "ROMs",
+      "enabled": true,
+      "title_from": "root_child_directory",
+      "directories": ["/path/to/roms"],
+      "globs": ["*.rom", "*.bin"],
+      "steam_shortcut": {
+        "executable": "/path/to/emulator",
+        "launch_options": "\"${file_path}\"",
+        "categories": ["ROMs"]
+      }
+    }
   ]
 }
 ```
 
-Shortcut settings may omit `start_directory` (defaults to the executable's parent),
-`launch_options` (defaults to an empty string), and `categories` (defaults to an
-empty list).
+`user_data_id` is the folder name under Steam's `userdata/` directory. Parsers discover games from subdirectories and expand `${file_path}` to the first matching file. `globs` uses [globset syntax](https://docs.rs/globset/latest/globset/#syntax).
 
-`list` displays configured apps and their launch settings.
+### SteamGridDB API key
 
-- `parse` processes enabled parsers and all explicit apps.
-- `parse --preview` previews those shortcuts without writing files.
-- `parse "Steam Link"` processes an app by its title.
-- `delete "Steam Link"` deletes that app's shortcut.
-- `delete` processes all configured parsers and apps, including disabled parsers.
+Steamdex uses [SteamGridDB](https://www.steamgriddb.com/) to find games and artwork. To get a key, sign in, open [Profile → Preferences → API](https://www.steamgriddb.com/profile/preferences/api), and click **Generate API Key**.
 
-A named command can also select a parser. If the name matches multiple entries,
-the command reports an ambiguity.
-
-File parsers expand `${file_path}` in launch options using the first matched file.
-Explicit apps use their configured launch options literally.
-
-SteamGridDB features require a `secrets.json` file containing your API key:
+Copy it into `~/.config/steamdex/secrets.json`:
 
 ```json
 {
@@ -97,21 +82,30 @@ SteamGridDB features require a `secrets.json` file containing your API key:
 }
 ```
 
-Preview, add or update, and remove the Steam Link shortcut:
+## Usage
 
-```bash
-steamdex parse "Steam Link" --preview
-steamdex parse "Steam Link"
-steamdex delete "Steam Link"
+```sh
+steamdex list                  # Show configuration
+steamdex parse --preview       # Preview changes
+steamdex parse                 # Add or update shortcuts
+steamdex parse "Steam Link"    # Process one app or parser
+steamdex delete "Steam Link"   # Remove one shortcut
+steamdex delete                # Remove configured shortcuts
 ```
+
+Close Steam before modifying shortcuts.
+
+## Roadmap
+
+- [ ] Build a functional CLI with configuration support.
+- [ ] Add local cache.
+- [ ] Add profiles for preconfigured setups, selectors, and game executable lookup.
+- [ ] Support glob-regex and full SRM Compatibility.
+- [ ] Add an Iced UI.
+- [ ] Support SteamCDN as provider.
 
 ## AI Disclosure
 
-Steamdex's hard parts are handwritten everything else is reviewed by me.
-I use AI to write trivial logic, research and understand code from other
-projects, and assist with supporting tasks like drafting error messages,
-editing Markdown, and generating tests.
+Steamdex's hard parts are handwritten everything else is reviewed by me. I use AI to write trivial logic, research and understand code from other projects, and assist with supporting tasks like drafting error messages, editing Markdown, and generating tests.
 
-Ludusavi is one of Steamdex's inspirations, and AI has helped me explore and
-understand its code. Feedback from experienced Rustaceans is very welcome and
-greatly appreciated.
+Ludusavi is one of Steamdex's inspirations, and AI has helped me explore and understand its code. Feedback from experienced Rustaceans is very welcome and greatly appreciated.
