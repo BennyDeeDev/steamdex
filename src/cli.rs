@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, path::PathBuf};
+use std::{collections::HashMap, env, error::Error, path::PathBuf};
 
 use clap::{Parser, Subcommand};
 
@@ -43,8 +43,7 @@ enum Command {
 pub(crate) async fn run() {
     let cli = Cli::parse();
 
-    // TODO: use .config here instead of steamdex.json
-    let config_path = cli.config.unwrap_or_else(|| "steamdex.json".into());
+    let config_path = cli.config.unwrap_or_else(default_config_path);
     let config_json = config::load(&config_path).unwrap_or_else(|error| {
         match error {
             ConfigLoadError::Read(error) => eprintln!(
@@ -64,6 +63,17 @@ pub(crate) async fn run() {
         Command::Parse { name, preview } => parse_command(&config_json, name, preview).await,
         Command::Delete { name } => delete_command(&config_json, name),
     }
+}
+
+fn default_config_path() -> PathBuf {
+    if let Some(config_dir) = env::var_os("XDG_CONFIG_HOME") {
+        return PathBuf::from(config_dir).join("steamdex/config.json");
+    }
+
+    env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".config/steamdex/config.json")
 }
 
 fn list_command(config: &crate::config::Config) {
