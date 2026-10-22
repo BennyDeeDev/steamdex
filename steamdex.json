@@ -1,4 +1,5 @@
 {
+  "secrets_file": "secrets.json",
   "steam": {
     "directory": "/path/to/Steam",
     "user_data_id": "123456789",

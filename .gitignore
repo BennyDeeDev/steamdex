@@ -1,6 +1,7 @@
 .direnv/
 .rumdl_cache/
 .env
+secrets.json
 .cache/
 
 # Added by cargo

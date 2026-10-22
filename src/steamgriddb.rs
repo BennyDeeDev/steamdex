@@ -78,15 +78,11 @@ pub struct SteamGridDbClient {
 }
 
 impl SteamGridDbClient {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let api_key = std::env::var("STEAMGRIDDB_API_KEY").map_err(|_| {
-            "STEAMGRIDDB_API_KEY is not set. Set it in the environment before using SteamGridDB."
-        })?;
-
-        Ok(Self {
+    pub fn new(api_key: String) -> Self {
+        Self {
             client: reqwest::Client::new(),
             api_key,
-        })
+        }
     }
 
     pub async fn search_first_game(

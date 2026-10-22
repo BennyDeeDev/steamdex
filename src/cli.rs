@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, error::Error, path::PathBuf};
+use std::{collections::HashMap, error::Error, path::PathBuf};
 
 use clap::{Parser, Subcommand};
 
@@ -43,7 +43,9 @@ enum Command {
 pub(crate) async fn run() {
     let cli = Cli::parse();
 
-    let config_path = cli.config.unwrap_or_else(default_config_path);
+    let config_path = cli
+        .config
+        .unwrap_or_else(|| config::default_config_directory().join("config.json"));
     let config_json = config::load(&config_path).unwrap_or_else(|error| {
         match error {
             ConfigLoadError::Read(error) => eprintln!(
@@ -63,17 +65,6 @@ pub(crate) async fn run() {
         Command::Parse { name, preview } => parse_command(&config_json, name, preview).await,
         Command::Delete { name } => delete_command(&config_json, name),
     }
-}
-
-fn default_config_path() -> PathBuf {
-    if let Some(config_dir) = env::var_os("XDG_CONFIG_HOME") {
-        return PathBuf::from(config_dir).join("steamdex/config.json");
-    }
-
-    env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".config/steamdex/config.json")
 }
 
 fn list_command(config: &crate::config::Config) {
@@ -250,10 +241,11 @@ async fn parse_command(config: &Config, name: Option<String>, preview: bool) {
         return;
     }
 
-    let sgdb = SteamGridDbClient::new().unwrap_or_else(|error| {
+    let secrets = config::load_secrets(&config.secrets_path()).unwrap_or_else(|error| {
         eprintln!("Could not initialize SteamGridDB: {error}");
         std::process::exit(1);
     });
+    let sgdb = SteamGridDbClient::new(secrets.steamgriddb_api_key);
     let mut app_ids_by_categories = HashMap::<Vec<String>, Vec<u32>>::new();
 
     for shortcut in &mut output.shortcuts {

@@ -1,5 +1,5 @@
 use std::{
-    fs, io,
+    env, fs, io,
     path::{Path, PathBuf},
 };
 
@@ -9,9 +9,50 @@ use serde::Deserialize;
 pub(crate) struct Config {
     pub(crate) steam: SteamConfig,
     #[serde(default)]
+    pub(crate) secrets_file: Option<PathBuf>,
+    #[serde(default)]
     pub(crate) parsers: Vec<ParserConfig>,
     #[serde(default)]
     pub(crate) apps: Vec<AppConfig>,
+}
+
+impl Config {
+    pub(crate) fn secrets_path(&self) -> PathBuf {
+        self.secrets_file
+            .clone()
+            .unwrap_or_else(|| default_config_directory().join("secrets.json"))
+    }
+}
+
+pub(crate) fn default_config_directory() -> PathBuf {
+    if let Some(config_dir) = env::var_os("XDG_CONFIG_HOME") {
+        return PathBuf::from(config_dir).join("steamdex");
+    }
+
+    env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".config/steamdex")
+}
+
+#[derive(Deserialize)]
+pub(crate) struct Secrets {
+    pub(crate) steamgriddb_api_key: String,
+}
+
+pub(crate) fn load_secrets(path: &Path) -> Result<Secrets, Box<dyn std::error::Error>> {
+    let contents = fs::read_to_string(path)
+        .map_err(|error| format!("Could not read secrets file '{}': {error}", path.display()))?;
+    let secrets: Secrets = serde_json::from_str(&contents)
+        .map_err(|error| format!("Could not parse secrets file '{}': {error}", path.display()))?;
+    if secrets.steamgriddb_api_key.trim().is_empty() {
+        return Err(format!(
+            "steamgriddb_api_key is empty in secrets file '{}'.",
+            path.display()
+        )
+        .into());
+    }
+    Ok(secrets)
 }
 
 #[derive(Deserialize)]
