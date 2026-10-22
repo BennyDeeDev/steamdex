@@ -11,10 +11,16 @@ use serde_json::{Value as JsonValue, json};
 
 use crate::{
     config::{SteamConfig, SteamShortcutConfig},
-    parser::ParsedTitles,
     steamgriddb::ArtworkType,
     vdf::{self, Value},
 };
+
+pub(crate) struct Shortcut {
+    pub(crate) title: String,
+    pub(crate) config: SteamShortcutConfig,
+    pub(crate) files: Vec<PathBuf>,
+    pub(crate) icon_path: Option<PathBuf>,
+}
 
 pub(crate) fn shortcut_app_ids(exe: &str, app_name: &str) -> (u64, i32) {
     let crc = crc32fast::hash(format!("{exe}{app_name}").as_bytes());
@@ -76,10 +82,8 @@ fn get_string_field<'a>(fields: &'a IndexMap<String, Value>, wanted: &str) -> Op
     None
 }
 
-fn build_shortcut(
-    config: &SteamShortcutConfig,
-    game: &ParsedTitles,
-) -> Result<IndexMap<String, Value>, Box<dyn Error>> {
+fn build_shortcut(shortcut: &Shortcut) -> Result<IndexMap<String, Value>, Box<dyn Error>> {
+    let config = &shortcut.config;
     let exe = config
         .executable
         .to_str()
@@ -91,13 +95,7 @@ fn build_shortcut(
         .unwrap_or_else(|| Path::new(""))
         .to_str()
         .ok_or("Steam shortcut start directory is not valid UTF-8")?;
-    let file = game
-        .files
-        .first()
-        .ok_or("Parsed title has no matching files")?;
-    let file_path = file.to_str().ok_or("Game file path is not valid UTF-8")?;
-    let launch_options = config.launch_options.replace("${file_path}", file_path);
-    let icon = match game.icon_path.as_deref() {
+    let icon = match shortcut.icon_path.as_deref() {
         Some(path) => path
             .to_str()
             .ok_or("Steam shortcut icon path is not valid UTF-8")?
@@ -110,27 +108,26 @@ fn build_shortcut(
         .enumerate()
         .map(|(index, category)| (index.to_string(), Value::String(category.clone())))
         .collect();
-    let (_, appid) = shortcut_app_ids(exe, &game.title);
+    let (_, appid) = shortcut_app_ids(exe, &shortcut.title);
 
     Ok(IndexMap::from([
         ("appid".to_owned(), Value::Int(appid)),
-        ("appname".to_owned(), Value::String(game.title.clone())),
+        ("appname".to_owned(), Value::String(shortcut.title.clone())),
         ("exe".to_owned(), Value::String(exe.to_owned())),
         (
             "StartDir".to_owned(),
             Value::String(start_directory.to_owned()),
         ),
-        ("LaunchOptions".to_owned(), Value::String(launch_options)),
+        (
+            "LaunchOptions".to_owned(),
+            Value::String(config.launch_options.clone()),
+        ),
         ("icon".to_owned(), Value::String(icon)),
         ("tags".to_owned(), Value::Object(tags)),
     ]))
 }
 
-pub(crate) fn write_shortcuts(
-    path: &Path,
-    config: &SteamShortcutConfig,
-    titles: &[ParsedTitles],
-) -> Result<(), Box<dyn Error>> {
+pub(crate) fn write_shortcuts(path: &Path, entries: &[Shortcut]) -> Result<(), Box<dyn Error>> {
     let mut shortcuts = vdf::read_vdf_shortcuts(path).map_err(|error| {
         format!(
             "Could not load shortcuts file '{}': {error}",
@@ -158,9 +155,10 @@ pub(crate) fn write_shortcuts(
         .filter_map(|slot| slot.parse::<u64>().ok())
         .max();
 
-    for title in titles {
-        let fields = build_shortcut(config, title)
-            .map_err(|error| format!("Could not build shortcut for '{}': {error}", title.title))?;
+    for shortcut in entries {
+        let fields = build_shortcut(shortcut).map_err(|error| {
+            format!("Could not build shortcut for '{}': {error}", shortcut.title)
+        })?;
 
         let exe = get_string_field(&fields, "exe").ok_or("New shortcut is missing exe")?;
         let appname =
@@ -293,11 +291,7 @@ pub(crate) fn write_categories(
     Ok(())
 }
 
-pub(crate) fn delete_shortcuts(
-    path: &Path,
-    config: &SteamShortcutConfig,
-    titles: &[ParsedTitles],
-) -> Result<(), Box<dyn Error>> {
+pub(crate) fn delete_shortcuts(path: &Path, entries: &[Shortcut]) -> Result<(), Box<dyn Error>> {
     let mut shortcuts = vdf::read_vdf_shortcuts(path).map_err(|error| {
         format!(
             "Could not load shortcuts file '{}': {error}",
@@ -305,26 +299,30 @@ pub(crate) fn delete_shortcuts(
         )
     })?;
 
-    let exe = config
-        .executable
-        .to_str()
-        .ok_or("Steam shortcut executable path is not valid UTF-8")?;
+    let mut targets = HashSet::new();
+    for shortcut in entries {
+        let exe = shortcut
+            .config
+            .executable
+            .to_str()
+            .ok_or("Steam shortcut executable path is not valid UTF-8")?;
+        targets.insert((exe, shortcut.title.as_str()));
+    }
 
-    let title_names: HashSet<&str> = titles.iter().map(|title| title.title.as_str()).collect();
     let original_len = shortcuts.len();
     shortcuts.retain(|_, shortcut| {
         let Value::Object(fields) = shortcut else {
             return true;
         };
 
-        if get_string_field(fields, "exe") != Some(exe) {
+        let (Some(exe), Some(appname)) = (
+            get_string_field(fields, "exe"),
+            get_string_field(fields, "appname"),
+        ) else {
             return true;
-        }
+        };
 
-        let matching_title =
-            get_string_field(fields, "appname").is_some_and(|name| title_names.contains(name));
-
-        !matching_title
+        !targets.contains(&(exe, appname))
     });
 
     if shortcuts.len() == original_len {

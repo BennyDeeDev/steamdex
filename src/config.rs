@@ -8,7 +8,10 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 pub(crate) struct Config {
     pub(crate) steam: SteamConfig,
+    #[serde(default)]
     pub(crate) parsers: Vec<ParserConfig>,
+    #[serde(default)]
+    pub(crate) apps: Vec<AppConfig>,
 }
 
 #[derive(Deserialize)]
@@ -67,10 +70,18 @@ pub(crate) struct ParserConfig {
 }
 
 #[derive(Deserialize)]
+pub(crate) struct AppConfig {
+    pub(crate) title: String,
+    pub(crate) steam_shortcut: SteamShortcutConfig,
+}
+
+#[derive(Deserialize, Clone)]
 pub(crate) struct SteamShortcutConfig {
     pub(crate) executable: PathBuf,
     pub(crate) start_directory: Option<PathBuf>,
+    #[serde(default)]
     pub(crate) launch_options: String,
+    #[serde(default)]
     pub(crate) categories: Vec<String>,
 }
 

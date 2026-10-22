@@ -93,5 +93,15 @@
         "categories": ["PC Bottles"]
       }
     }
+  ],
+  "apps": [
+    {
+      "title": "Steam Link",
+      "steam_shortcut": {
+        "executable": "/usr/bin/flatpak",
+        "launch_options": "run com.valvesoftware.SteamLink",
+        "categories": ["Media"]
+      }
+    }
   ]
 }

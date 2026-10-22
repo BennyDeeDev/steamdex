@@ -18,14 +18,15 @@ portable, and easy to automate.
 
 ## Parser file matching
 
-The configuration has a `steam` section and a list of `parsers`. Each parser
+The configuration has a `steam` section and optional `parsers` and `apps` lists.
+Parsers discover titles from files; apps declare shortcuts directly. Each parser
 includes its file-matching rules and a `steam_shortcut` definition:
 
 ```json
 {
   "steam": {
     "directory": "/path/to/Steam",
-    "user_data_id": "123456789",
+    "user_data_id": "123456789"
   },
   "parsers": [
     {
@@ -46,6 +47,55 @@ includes its file-matching rules and a `steam_shortcut` definition:
 ```
 
 Each parser's `globs` field is a list of [globset patterns](https://docs.rs/globset/latest/globset/#syntax).
+
+## Explicit apps
+
+Declare apps directly in the top-level `apps` list in the same configuration file:
+
+```json
+{
+  "steam": {
+    "directory": "/path/to/Steam",
+    "user_data_id": "123456789"
+  },
+  "apps": [
+    {
+      "title": "Steam Link",
+      "steam_shortcut": {
+        "executable": "/usr/bin/flatpak",
+        "launch_options": "run com.valvesoftware.SteamLink",
+        "categories": ["Media"]
+      }
+    }
+  ]
+}
+```
+
+Shortcut settings may omit `start_directory` (defaults to the executable's parent),
+`launch_options` (defaults to an empty string), and `categories` (defaults to an
+empty list).
+
+`list` displays configured apps and their launch settings.
+
+- `parse` processes enabled parsers and all explicit apps.
+- `parse --preview` previews those shortcuts without writing files.
+- `parse "Steam Link"` processes an app by its title.
+- `delete "Steam Link"` deletes that app's shortcut.
+- `delete` processes all configured parsers and apps, including disabled parsers.
+
+A named command can also select a parser. If the name matches multiple entries,
+the command reports an ambiguity.
+
+File parsers expand `${file_path}` in launch options using the first matched file.
+Explicit apps use their configured launch options literally.
+
+Preview, add or update, and remove the Steam Link shortcut:
+
+```bash
+steamdex parse "Steam Link" --preview
+steamdex parse "Steam Link"
+steamdex delete "Steam Link"
+```
 
 ## AI Disclosure
 
