@@ -3,7 +3,8 @@
     "directory": "/path/to/Steam",
     "user_data_id": "123456789",
     "artwork_directory": ".cache/steamdex/generated-artwork",
-    "shortcuts_file": ".cache/steamdex/shortcuts.vdf"
+    "shortcuts_file": ".cache/steamdex/shortcuts.vdf",
+    "collections_file": "test-data/cloud-storage-namespace-1.json"
   },
   "parsers": [
     {

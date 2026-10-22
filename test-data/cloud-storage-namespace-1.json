@@ -1,0 +1,24 @@
+[
+  [
+    "user-collections.steamdex-roms",
+    {
+      "key": "user-collections.steamdex-roms",
+      "timestamp": 1792627200,
+      "value": "{\"id\":\"steamdex-roms\",\"name\":\"ROMs\",\"added\":[2316483636,2445344750],\"removed\":[]}",
+      "version": "7482",
+      "conflictResolutionMethod": "custom",
+      "strMethodId": "union-collections"
+    }
+  ],
+  [
+    "user-collections.uc-existing-nes",
+    {
+      "key": "user-collections.uc-existing-nes",
+      "timestamp": 1792627200,
+      "value": "{\"id\":\"uc-existing-nes\",\"name\":\"NES\",\"added\":[2316483636],\"removed\":[]}",
+      "version": "7482",
+      "conflictResolutionMethod": "custom",
+      "strMethodId": "union-collections"
+    }
+  ]
+]

@@ -3,9 +3,11 @@ use std::{
     error::Error,
     fs,
     path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use indexmap::IndexMap;
+use serde_json::{Value as JsonValue, json};
 
 use crate::{
     config::{SteamConfig, SteamShortcutConfig},
@@ -195,6 +197,100 @@ pub(crate) fn write_shortcuts(
     }
 
     vdf::write_vdf_shortcuts(path, &shortcuts)
+}
+
+pub(crate) fn write_categories(
+    path: &Path,
+    categories: &[String],
+    app_ids: &[u32],
+) -> Result<(), Box<dyn Error>> {
+    if categories.is_empty() || app_ids.is_empty() {
+        return Ok(());
+    }
+
+    let mut entries: Vec<(String, JsonValue)> = serde_json::from_slice(&fs::read(path)?)?;
+
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?;
+    let mut changed = false;
+
+    for category in categories {
+        let wanted = category.to_lowercase();
+        let mut found = None;
+
+        for (index, (key, entry)) in entries.iter().enumerate() {
+            if !key.starts_with("user-collections.") {
+                continue;
+            }
+
+            let Some(value) = entry["value"].as_str() else {
+                continue;
+            };
+
+            let collection: JsonValue = serde_json::from_str(value)?;
+
+            if collection["name"]
+                .as_str()
+                .is_some_and(|name| name.to_lowercase() == wanted)
+            {
+                found = Some((index, collection));
+                break;
+            }
+        }
+
+        let (index, mut collection) = match found {
+            Some(found) => found,
+            None => {
+                let id = format!("steamdex-{}-{}", now.as_nanos(), entries.len());
+                let key = format!("user-collections.{id}");
+
+                entries.push((
+                    key.clone(),
+                    json!({
+                        "key": key,
+                    }),
+                ));
+
+                (
+                    entries.len() - 1,
+                    json!({
+                        "id": id,
+                        "name": category,
+                        "added": [],
+                    }),
+                )
+            }
+        };
+
+        let original = collection.clone();
+
+        if collection["added"].is_null() {
+            collection["added"] = json!([]);
+        }
+
+        let added = collection["added"]
+            .as_array_mut()
+            .ok_or("Collection 'added' must be an array")?;
+
+        for &app_id in app_ids {
+            let value = json!(app_id);
+
+            if !added.contains(&value) {
+                added.push(value);
+            }
+        }
+
+        if collection != original {
+            entries[index].1["value"] = JsonValue::String(serde_json::to_string(&collection)?);
+            entries[index].1["timestamp"] = json!(now.as_secs());
+            changed = true;
+        }
+    }
+
+    if changed {
+        fs::write(path, serde_json::to_vec(&entries)?)?;
+    }
+
+    Ok(())
 }
 
 pub(crate) fn delete_shortcuts(

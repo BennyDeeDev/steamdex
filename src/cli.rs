@@ -77,6 +77,10 @@ fn list_command(config: &crate::config::Config) {
         "  Shortcuts file: {}",
         config.steam.shortcuts_path().display()
     );
+    println!(
+        "  Collections file: {}",
+        config.steam.collections_path().display()
+    );
 
     if config.parsers.is_empty() {
         println!();
@@ -417,7 +421,33 @@ async fn parse_and_write_shortcuts(
     println!();
     let path = steam_config.shortcuts_path();
     match steam::write_shortcuts(&path, &parser_config.steam_shortcut, &output.titles) {
-        Ok(()) => println!("Wrote shortcuts to {}", path.display()),
+        Ok(()) => {
+            println!("Wrote shortcuts to {}", path.display());
+
+            let app_ids: Vec<u32> = output
+                .titles
+                .iter()
+                .map(|title| {
+                    let (_, id) = steam::shortcut_app_ids(executable, &title.title);
+                    id as u32
+                })
+                .collect();
+
+            let collections_path = steam_config.collections_path();
+            if let Err(error) = steam::write_categories(
+                &collections_path,
+                &parser_config.steam_shortcut.categories,
+                &app_ids,
+            ) {
+                output.errors.push(
+                    format!(
+                        "Could not write collections '{}': {error}",
+                        collections_path.display()
+                    )
+                    .into(),
+                );
+            }
+        }
         Err(error) => output.errors.push(error),
     }
 

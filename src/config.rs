@@ -19,6 +19,8 @@ pub(crate) struct SteamConfig {
     pub(crate) artwork_directory: Option<PathBuf>,
     #[serde(default)]
     pub(crate) shortcuts_file: Option<PathBuf>,
+    #[serde(default)]
+    pub(crate) collections_file: Option<PathBuf>,
 }
 
 impl SteamConfig {
@@ -39,6 +41,17 @@ impl SteamConfig {
                 .join(&self.user_data_id)
                 .join("config")
                 .join("grid")
+        })
+    }
+
+    pub(crate) fn collections_path(&self) -> PathBuf {
+        self.collections_file.clone().unwrap_or_else(|| {
+            self.directory
+                .join("userdata")
+                .join(&self.user_data_id)
+                .join("config")
+                .join("cloudstorage")
+                .join("cloud-storage-namespace-1.json")
         })
     }
 }
