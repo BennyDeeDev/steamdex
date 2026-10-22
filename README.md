@@ -1,6 +1,6 @@
 # Steamdex
 
-Steamdex is a declarative Steam library manager for ROMs and non-Steam apps, written in Rust. Configure shortcuts in JSON instead of using Steam ROM Manager's GUI rules.
+Steamdex is a declarative Steam library manager for ROMs and non-Steam apps, written in Rust.
 
 ## Installation
 
