@@ -89,6 +89,14 @@ the command reports an ambiguity.
 File parsers expand `${file_path}` in launch options using the first matched file.
 Explicit apps use their configured launch options literally.
 
+SteamGridDB features require a `secrets.json` file containing your API key:
+
+```json
+{
+  "steamgriddb_api_key": "your-api-key"
+}
+```
+
 Preview, add or update, and remove the Steam Link shortcut:
 
 ```bash
